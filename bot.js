@@ -101,7 +101,7 @@ bot.onText(/\/lastentry/, async (msg) => {
 });
 
 // Handle /removeLastEntry command
-bot.onText(/\/removeLastEntry/, async (msg) => {
+bot.onText(/\/removelastentry/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
