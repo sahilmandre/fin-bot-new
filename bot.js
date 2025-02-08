@@ -17,7 +17,7 @@ const range = "Sheet1!A2:D"; // Adjust the range to include all rows
 const sheets = google.sheets("v4");
 const authClient = new google.auth.JWT({
   email: client_email,
-  key: private_key,
+  key: process.env.PRIVATE_KEY.replace(/\\n/g, "\n"),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
