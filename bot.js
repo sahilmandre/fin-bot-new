@@ -3,7 +3,8 @@ const TelegramBot = require("node-telegram-bot-api");
 const { google } = require("googleapis");
 
 // Constants and environment variables
-const key = process.env.GOOGLE_PRIVATE_KEY;
+const key =
+  "***REMOVED***\n";
 const client_email = process.env.GOOGLE_CLIENT_EMAIL;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const sheetId = process.env.GOOGLE_SHEET_ID;
