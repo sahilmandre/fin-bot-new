@@ -7,7 +7,18 @@ const app = express();
 
 // Simple keep-alive endpoint
 app.get("/", (req, res) => {
-  res.send("Bot is running!");
+  res.send(`
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Bot is Running</title>
+      </head>
+      <body>
+        <p>Bot is running! Created with ❤️ by Sahil Mandre.</p>
+        <p>To visit the code, click <a href="https://github.com/sahilmandre/fin-bot" target="_blank">here</a>.</p>
+      </body>
+    </html>
+  `);
 });
 
 // Start the Express server on any available port
