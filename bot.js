@@ -2,6 +2,20 @@ require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
 const { google } = require("googleapis");
 
+const express = require("express");
+const app = express();
+
+// Simple keep-alive endpoint
+app.get("/", (req, res) => {
+  res.send("Bot is running!");
+});
+
+// Start the Express server on any available port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Keep-alive server running on port ${PORT}`);
+});
+
 // Constants and environment variables
 const key =
   "***REMOVED***\n";
