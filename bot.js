@@ -60,18 +60,18 @@ bot.onText(/\/instructions/, (msg) => {
       "/instructions - Show instructions\n" +
       "/lastentry - View the last entry\n" +
       "/view - View all entries\n" +
-      "/removeLastEntry - Remove the last entry"
+      "/removelastentry - Remove the last entry"
   );
 });
 
 // Handle invalid commands
 bot.onText(
-  /\/(?!start|instructions|lastentry|view|removeLastEntry).*/,
+  /\/(?!start|instructions|lastentry|view|removelastentry).*/,
   (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(
       chatId,
-      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view or /removeLastEntry."
+      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view or /removelastentry."
     );
   }
 );
