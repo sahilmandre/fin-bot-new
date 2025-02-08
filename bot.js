@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
       </head>
       <body>
         <p>Bot is running! Created with ❤️ by Sahil Mandre.</p>
-        <p>To visit the code, click <a href="https://github.com/sahilmandre/fin-bot" target="_blank">here</a>.</p>
+        <p>To visit the code, click <a href="https://github.com/sahilmandre/fin-bot-new" target="_blank">here</a>.</p>
       </body>
     </html>
   `);
