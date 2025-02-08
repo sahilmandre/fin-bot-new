@@ -211,6 +211,54 @@ bot.on("message", (msg) => {
   }
 });
 
+// /export command: Export expense data as a CSV file
+bot.onText(/\/export/, async (msg) => {
+  const chatId = msg.chat.id;
+  try {
+    // Retrieve all entries from the Google Sheet (using your existing function)
+    const entries = await getAllEntriesFromSheet();
+
+    if (!entries || entries.length === 0) {
+      bot.sendMessage(chatId, "No entries found to export.");
+      return;
+    }
+
+    // Build the CSV string
+    // CSV header
+    let csvData = "Date & Time,Amount,Category,Username\n";
+    // Add each entry as a new row
+    entries.forEach((entry) => {
+      // If any value might contain a comma, you can wrap it in double quotes.
+      // For example: `"${entry.date}","${entry.amount}","${entry.category}","${entry.username}"`
+      csvData += `"${entry.date}","${entry.amount}",${entry.category},${entry.username}\n`;
+    });
+
+    // Option 1: Send the CSV as a document from a buffer without saving to disk.
+    const buffer = Buffer.from(csvData, "utf-8");
+    bot.sendDocument(
+      chatId,
+      buffer,
+      {},
+      { filename: "expenses.csv", contentType: "text/csv" }
+    );
+
+    // Option 2: Alternatively, if you prefer writing to a temporary file, you can use fs:
+    //
+    // const filePath = "./expenses.csv";
+    // fs.writeFileSync(filePath, csvData);
+    // bot.sendDocument(chatId, filePath).then(() => {
+    //   // Optionally delete the file after sending it
+    //   fs.unlinkSync(filePath);
+    // });
+  } catch (error) {
+    console.error("Error exporting data:", error);
+    bot.sendMessage(
+      chatId,
+      "There was an error exporting the data. Please try again later."
+    );
+  }
+});
+
 // ################ Functions ################
 
 // Get the budget from cell I1
