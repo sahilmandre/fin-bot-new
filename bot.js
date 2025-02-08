@@ -17,8 +17,7 @@ app.listen(PORT, () => {
 });
 
 // Constants and environment variables
-const key =
-  "***REMOVED***\n";
+const key = process.env.GOOGLE_PRIVATE_KEY;
 const client_email = process.env.GOOGLE_CLIENT_EMAIL;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const sheetId = process.env.GOOGLE_SHEET_ID;
@@ -36,29 +35,7 @@ const authClient = new google.auth.JWT({
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
-async function getLastEntryFromSheet() {
-  await authClient.authorize();
-
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId,
-    range,
-  });
-
-  const rows = response.data.values;
-
-  if (!rows || rows.length === 0) {
-    return null;
-  }
-
-  const lastEntry = rows[rows.length - 1];
-
-  return {
-    date: lastEntry[0],
-    amount: lastEntry[1],
-    category: lastEntry[2],
-  };
-}
+// ################ Commands ################
 
 // Initialize the bot
 const bot = new TelegramBot(token, { polling: true });
@@ -77,18 +54,27 @@ bot.onText(/\/instructions/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(
     chatId,
-    "To add an entry, send me the amount and what it was spent on, like this: '100 Groceries'."
+    "To add an entry, send me the amount and what it was spent on, like this: '100 Groceries'.\n\n" +
+      "Available commands:\n" +
+      "/start - Start the bot\n" +
+      "/instructions - Show instructions\n" +
+      "/lastentry - View the last entry\n" +
+      "/view - View all entries\n" +
+      "/removeLastEntry - Remove the last entry"
   );
 });
 
 // Handle invalid commands
-bot.onText(/\/(?!start|instructions|lastentry|view).*/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(
-    chatId,
-    "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view."
-  );
-});
+bot.onText(
+  /\/(?!start|instructions|lastentry|view|removeLastEntry).*/,
+  (msg) => {
+    const chatId = msg.chat.id;
+    bot.sendMessage(
+      chatId,
+      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view or /removeLastEntry."
+    );
+  }
+);
 
 // Handle /lastEntry command
 bot.onText(/\/lastentry/, async (msg) => {
@@ -110,6 +96,26 @@ bot.onText(/\/lastentry/, async (msg) => {
     bot.sendMessage(
       chatId,
       "There was an error fetching your last entry. Please try again."
+    );
+  }
+});
+
+// Handle /removeLastEntry command
+bot.onText(/\/removeLastEntry/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    // Delete the last row and get the removed entry details
+    const removedEntry = await deleteLastRowFromSheet();
+
+    // Send a confirmation message to the user
+    const message = `✅ Last entry removed:\n\nDate: ${removedEntry.date}\nAmount: ${removedEntry.amount}\nCategory: ${removedEntry.category}`;
+    bot.sendMessage(chatId, message);
+  } catch (error) {
+    console.error("Error removing last entry:", error);
+    bot.sendMessage(
+      chatId,
+      "There was an error removing the last entry. Please try again."
     );
   }
 });
@@ -168,6 +174,80 @@ bot.on("message", (msg) => {
     );
   }
 });
+
+// ################ Functions ################
+// Function to get last entry
+
+async function getLastEntryFromSheet() {
+  await authClient.authorize();
+
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId,
+    range,
+  });
+
+  const rows = response.data.values;
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  const lastEntry = rows[rows.length - 1];
+
+  return {
+    date: lastEntry[0],
+    amount: lastEntry[1],
+    category: lastEntry[2],
+  };
+}
+
+async function deleteLastRowFromSheet() {
+  await authClient.authorize();
+
+  // Fetch the last row index
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId,
+    range: "Sheet1!A2:D",
+  });
+
+  const rows = response.data.values;
+
+  if (!rows || rows.length === 0) {
+    throw new Error("No entries found.");
+  }
+
+  // Calculate the correct last row index (accounting for header row)
+  const lastRowIndex = rows.length + 1; // Data starts at row 2, so +1
+
+  // Delete the last row
+  await sheets.spreadsheets.batchUpdate({
+    auth: authClient,
+    spreadsheetId,
+    resource: {
+      requests: [
+        {
+          deleteDimension: {
+            range: {
+              sheetId: 0, // Replace with actual sheet ID if needed
+              dimension: "ROWS",
+              startIndex: lastRowIndex - 1, // Correct 0-based index
+              endIndex: lastRowIndex, // Delete only one row
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  // Return the last entry details
+  return {
+    date: rows[rows.length - 1][0],
+    amount: rows[rows.length - 1][1],
+    category: rows[rows.length - 1][2],
+  };
+}
 
 // Function to add entry to Google Sheets
 async function addEntryToSheet(chatId, amount, description) {
