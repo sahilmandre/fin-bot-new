@@ -18,14 +18,16 @@ app.listen(PORT, () => {
 
 // Constants and environment variables
 const key = process.env.GOOGLE_PRIVATE_KEY;
+// Replace literal "\n" characters if needed:
+const private_key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
 const client_email = process.env.GOOGLE_CLIENT_EMAIL;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const sheetId = process.env.GOOGLE_SHEET_ID;
-const private_key = key;
 const budget = 6000;
+
 // Google Sheet ID and Range
 const spreadsheetId = sheetId;
-const range = "Sheet1!A2:D"; // Adjust the range to include all rows
+const range = "Sheet1!A2:D"; // Now expecting 4 columns: date, amount, category, username
 
 // Google Sheets API Setup
 const sheets = google.sheets("v4");
@@ -45,7 +47,7 @@ bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(
     chatId,
-    'Welcome! Send me the amount and what it was spent on, like this: "100 Groceries".'
+    'Welcome! Send me the amount and what it was spent on, like this: "100 Grocery".'
   );
 });
 
@@ -54,7 +56,7 @@ bot.onText(/\/instructions/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(
     chatId,
-    "To add an entry, send me the amount and what it was spent on, like this: '100 Groceries'.\n\n" +
+    "To add an entry, send me the amount and what it was spent on, like this: '100 Grocery'.\n\n" +
       "Available commands:\n" +
       "/start - Start the bot\n" +
       "/instructions - Show instructions\n" +
@@ -76,7 +78,7 @@ bot.onText(
   }
 );
 
-// Handle /lastEntry command
+// Handle /lastentry command
 bot.onText(/\/lastentry/, async (msg) => {
   const chatId = msg.chat.id;
 
@@ -88,7 +90,7 @@ bot.onText(/\/lastentry/, async (msg) => {
       return;
     }
 
-    const message = `Last entry: Date - ${lastEntry.date}, Amount - ${lastEntry.amount}, Category - ${lastEntry.category}`;
+    const message = `Last entry:\nDate: ${lastEntry.date}\nAmount: ${lastEntry.amount}\nCategory: ${lastEntry.category}\nUsername: ${lastEntry.username}`;
 
     bot.sendMessage(chatId, message);
   } catch (error) {
@@ -100,7 +102,7 @@ bot.onText(/\/lastentry/, async (msg) => {
   }
 });
 
-// Handle /removeLastEntry command
+// Handle /removelastentry command
 bot.onText(/\/removelastentry/, async (msg) => {
   const chatId = msg.chat.id;
 
@@ -109,7 +111,7 @@ bot.onText(/\/removelastentry/, async (msg) => {
     const removedEntry = await deleteLastRowFromSheet();
 
     // Send a confirmation message to the user
-    const message = `✅ Last entry removed:\n\nDate: ${removedEntry.date}\nAmount: ${removedEntry.amount}\nCategory: ${removedEntry.category}`;
+    const message = `✅ Last entry removed:\n\nDate: ${removedEntry.date}\nAmount: ${removedEntry.amount}\nCategory: ${removedEntry.category}\nUsername: ${removedEntry.username}`;
     bot.sendMessage(chatId, message);
   } catch (error) {
     console.error("Error removing last entry:", error);
@@ -138,7 +140,7 @@ bot.onText(/\/view/, async (msg) => {
     entries.forEach((entry, index) => {
       message += `**${index + 1}**. Date: ${entry.date}, *Amount:* ${
         entry.amount
-      }, *Category:* **${entry.category}**\n\n`;
+      }, *Category:* **${entry.category}**, *Username:* ${entry.username}\n\n`;
     });
 
     // Send the formatted message to the user
@@ -154,10 +156,15 @@ bot.onText(/\/view/, async (msg) => {
 
 // Handle messages for adding entries
 bot.on("message", (msg) => {
-  const chatId = msg.chat.id;
-  const text = msg.text;
+  // Ignore commands in this handler
+  if (!msg.text || msg.text.startsWith("/")) return;
 
-  // Check if the message is in the correct format
+  const chatId = msg.chat.id;
+  const text = msg.text.trim();
+  // Extract the username from the chat. Fallback to first name if username is not available.
+  const username = msg.chat.username || msg.chat.first_name || "Unknown";
+
+  // Check if the message is in the correct format: "100 Grocery"
   const regex = /^(\d+)\s+(.+)$/;
   const match = text.match(regex);
 
@@ -165,19 +172,19 @@ bot.on("message", (msg) => {
     const amount = match[1];
     const description = match[2];
 
-    // Add the entry to Google Sheets
-    addEntryToSheet(chatId, amount, description);
-  } else if (!msg.text.startsWith("/")) {
+    // Add the entry to Google Sheets along with the username
+    addEntryToSheet(chatId, amount, description, username);
+  } else {
     bot.sendMessage(
       chatId,
-      'Please send the amount and description in the format: "100 Groceries".'
+      'Please send the amount and description in the format: "100 Grocery".'
     );
   }
 });
 
 // ################ Functions ################
-// Function to get last entry
 
+// Function to get last entry
 async function getLastEntryFromSheet() {
   await authClient.authorize();
 
@@ -199,6 +206,7 @@ async function getLastEntryFromSheet() {
     date: lastEntry[0],
     amount: lastEntry[1],
     category: lastEntry[2],
+    username: lastEntry[3], // New field
   };
 }
 
@@ -221,7 +229,7 @@ async function deleteLastRowFromSheet() {
   // Calculate the correct last row index (accounting for header row)
   const lastRowIndex = rows.length + 1; // Data starts at row 2, so +1
 
-  // Delete the last row
+  // Delete the last row (assuming sheetId is 0; update if needed)
   await sheets.spreadsheets.batchUpdate({
     auth: authClient,
     spreadsheetId,
@@ -230,7 +238,7 @@ async function deleteLastRowFromSheet() {
         {
           deleteDimension: {
             range: {
-              sheetId: 0, // Replace with actual sheet ID if needed
+              sheetId: 0, // Replace with the actual sheet ID if necessary
               dimension: "ROWS",
               startIndex: lastRowIndex - 1, // Correct 0-based index
               endIndex: lastRowIndex, // Delete only one row
@@ -241,26 +249,27 @@ async function deleteLastRowFromSheet() {
     },
   });
 
-  // Return the last entry details
+  // Return the last entry details (including username)
   return {
     date: rows[rows.length - 1][0],
     amount: rows[rows.length - 1][1],
     category: rows[rows.length - 1][2],
+    username: rows[rows.length - 1][3],
   };
 }
 
-// Function to add entry to Google Sheets
-async function addEntryToSheet(chatId, amount, description) {
+// Function to add entry to Google Sheets (now with username)
+async function addEntryToSheet(chatId, amount, description, username) {
   try {
     await authClient.authorize();
 
-    const response = await sheets.spreadsheets.values.append({
+    await sheets.spreadsheets.values.append({
       auth: authClient,
       spreadsheetId,
-      range: "Sheet1!A2:D2", // Append to the next available row
+      range: "Sheet1!A2:D2", // Append to the next available row (4 columns)
       valueInputOption: "USER_ENTERED",
       resource: {
-        values: [[new Date().toLocaleString(), amount, description]],
+        values: [[new Date().toLocaleString(), amount, description, username]],
       },
     });
 
@@ -271,7 +280,7 @@ async function addEntryToSheet(chatId, amount, description) {
     // Send the response back to the user
     bot.sendMessage(
       chatId,
-      `Entry added for ${description}!\nTotal Spent: ${totalSpent}\nLast Amount: ${amount} \nRemaining Amount: ${remainingAmount}`
+      `Entry added for ${description} by ${username}!\nTotal Spent: ${totalSpent}\nLast Amount: ${amount}\nRemaining Amount: ${remainingAmount}`
     );
   } catch (error) {
     console.error("Error adding entry to sheet:", error);
@@ -289,7 +298,7 @@ async function getAllEntriesFromSheet() {
   const response = await sheets.spreadsheets.values.get({
     auth: authClient,
     spreadsheetId,
-    range: "Sheet1!A2:D", // Fetch all rows starting from row 2
+    range: "Sheet1!A2:D", // Now expecting 4 columns
   });
 
   const rows = response.data.values;
@@ -298,17 +307,18 @@ async function getAllEntriesFromSheet() {
     return [];
   }
 
-  // Map rows to entries
+  // Map rows to entries including username
   const entries = rows.map((row) => ({
     date: row[0], // Column A: Date and Time
     amount: row[1], // Column B: Amount
-    category: row[2], // Column C: Category
+    category: row[2], // Column C: Category/Description
+    username: row[3], // Column D: Username
   }));
 
   return entries;
 }
 
-// Function to calculate total spent
+// Function to calculate total spent (remains unchanged)
 async function calculateTotalSpent() {
   const response = await sheets.spreadsheets.values.get({
     auth: authClient,
