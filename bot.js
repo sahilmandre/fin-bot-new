@@ -23,7 +23,7 @@ const private_key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
 const client_email = process.env.GOOGLE_CLIENT_EMAIL;
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const sheetId = process.env.GOOGLE_SHEET_ID;
-const budget = 6000;
+let budget = 6000; // Default budget is 6000 and can be changed later
 
 // Google Sheet ID and Range
 const spreadsheetId = sheetId;
@@ -62,18 +62,47 @@ bot.onText(/\/instructions/, (msg) => {
       "/instructions - Show instructions\n" +
       "/lastentry - View the last entry\n" +
       "/view - View all entries\n" +
-      "/removelastentry - Remove the last entry"
+      "/removelastentry - Remove the last entry\n" +
+      "/setbudget <amount> - Set a custom budget"
   );
+});
+
+// New: /setbudget command to update the budget dynamically
+// /setbudget command: update the budget in cell I1
+bot.onText(/\/setbudget (\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+
+  if (!match || !match[1]) {
+    bot.sendMessage(
+      chatId,
+      "Please provide a valid budget amount, e.g., /setbudget 7000"
+    );
+    return;
+  }
+
+  const newBudget = parseFloat(match[1]);
+  if (isNaN(newBudget) || newBudget < 0) {
+    bot.sendMessage(chatId, "The budget must be a positive number.");
+    return;
+  }
+
+  try {
+    await updateBudgetInSheet(newBudget);
+    bot.sendMessage(chatId, `Budget has been updated to ${newBudget}`);
+  } catch (error) {
+    console.error("Error updating budget:", error);
+    bot.sendMessage(chatId, "Error updating budget. Please try again.");
+  }
 });
 
 // Handle invalid commands
 bot.onText(
-  /\/(?!start|instructions|lastentry|view|removelastentry).*/,
+  /\/(?!start|instructions|lastentry|view|removelastentry|setbudget).*/,
   (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(
       chatId,
-      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view or /removelastentry."
+      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view, /removelastentry, or /setbudget."
     );
   }
 );
@@ -184,6 +213,35 @@ bot.on("message", (msg) => {
 
 // ################ Functions ################
 
+// Get the budget from cell I1
+async function getBudgetFromSheet() {
+  await authClient.authorize();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId,
+    range: "Sheet1!I1",
+  });
+  const values = response.data.values;
+  if (values && values.length > 0 && values[0].length > 0) {
+    return parseFloat(values[0][0]) || 0;
+  }
+  return 0; // default if not set
+}
+
+// Update the budget in cell I1
+async function updateBudgetInSheet(newBudget) {
+  await authClient.authorize();
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId,
+    range: "Sheet1!I1",
+    valueInputOption: "USER_ENTERED",
+    resource: {
+      values: [[newBudget]],
+    },
+  });
+}
+
 // Function to get last entry
 async function getLastEntryFromSheet() {
   await authClient.authorize();
@@ -273,9 +331,10 @@ async function addEntryToSheet(chatId, amount, description, username) {
       },
     });
 
-    // Calculate the remaining amount
+    // After adding an entry, fetch the current budget from cell I1
+    const currentBudget = await getBudgetFromSheet();
     const totalSpent = await calculateTotalSpent();
-    const remainingAmount = budget - totalSpent;
+    const remainingAmount = currentBudget - totalSpent;
 
     // Send the response back to the user
     bot.sendMessage(
