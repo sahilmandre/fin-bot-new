@@ -63,7 +63,9 @@ bot.onText(/\/instructions/, (msg) => {
       "/lastentry - View the last entry\n" +
       "/view - View all entries\n" +
       "/removelastentry - Remove the last entry\n" +
-      "/setbudget <amount> - Set a custom budget"
+      "/setbudget <amount> - Set a custom budget (stored in cell I1)\n" +
+      "/export - Export all expenses as a CSV file\n" +
+      "/category <category> - Filter spending by category. To get result for a specific category, e.g., /category Food  \n"
   );
 });
 
@@ -97,7 +99,7 @@ bot.onText(/\/setbudget (\d+)/, async (msg, match) => {
 
 // Handle invalid commands
 bot.onText(
-  /\/(?!start|instructions|lastentry|view|removelastentry|setbudget).*/,
+  /\/(?!start|instructions|lastentry|view|removelastentry|setbudget|export|category).*/,
   (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(
@@ -255,6 +257,60 @@ bot.onText(/\/export/, async (msg) => {
     bot.sendMessage(
       chatId,
       "There was an error exporting the data. Please try again later."
+    );
+  }
+});
+
+// /category command: Filter spending by category
+bot.onText(/^\/category(?:\s+(.+))?$/, async (msg, match) => {
+  const chatId = msg.chat.id;
+
+  // If no category is provided, match[1] will be undefined
+  if (!match[1]) {
+    bot.sendMessage(
+      chatId,
+      "Please provide a category in the proper format, e.g., /category Food"
+    );
+    return;
+  }
+
+  const categoryToFilter = match[1].trim();
+
+  try {
+    // Fetch all entries (assumes you have a getAllEntriesFromSheet function)
+    const entries = await getAllEntriesFromSheet();
+
+    // Filter entries by category (case-insensitive comparison)
+    const filteredEntries = entries.filter(
+      (entry) => entry.category.toLowerCase() === categoryToFilter.toLowerCase()
+    );
+
+    if (filteredEntries.length === 0) {
+      bot.sendMessage(
+        chatId,
+        `No entries found for category "${categoryToFilter}".`
+      );
+      return;
+    }
+
+    // Build a message listing each entry and summing the amounts
+    let message = `**Entries for category "${categoryToFilter}":**\n\n`;
+    let total = 0;
+
+    filteredEntries.forEach((entry, index) => {
+      message += `${index + 1}. Date: ${entry.date}, Amount: ${
+        entry.amount
+      }, Username: ${entry.username}\n`;
+      total += parseFloat(entry.amount) || 0;
+    });
+
+    message += `\n**Total spent in "${categoryToFilter}":** ${total}`;
+    bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error filtering by category:", error);
+    bot.sendMessage(
+      chatId,
+      "There was an error fetching category data. Please try again later."
     );
   }
 });
