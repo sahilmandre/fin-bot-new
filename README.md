@@ -132,6 +132,7 @@ For any questions or feedback, please open an issue or reach out via GitHub.
 ## Demo & Uptime
 - **Live Bot:** [https://fin-bot-new.onrender.com/](https://fin-bot-new.onrender.com/)
 - **Uptime Monitoring:** [UptimeRobot Dashboard](https://dashboard.uptimerobot.com/monitors/798540552)
+- **Creator's Portfolio:** [Sahil Mandre Portfolio](https://portfolio-sahilmandre.vercel.app/)
 
 ---
 
