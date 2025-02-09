@@ -21,6 +21,9 @@ This project is open-source and is built using Node.js, Express, and the Google 
 - [Contact](#contact)
 - [Demo & Uptime](#demo--uptime)
 
+#### Securely Removing Sensitive Data from Git History
+- [Secure-Repo.md](Secure-Repo.md)
+
 ## Features
 - **Expense Entry:** Add expense entries simply by sending a message in the format `"100 Grocery"`.
 - **User Identification:** Each entry logs the Telegram username of the person who made the entry.
@@ -133,3 +136,8 @@ For any questions or feedback, please open an issue or reach out via GitHub.
 ---
 
 *Happy Expense Tracking with Fin-Bot!*
+
+## Securely Removing Sensitive Data from Git History
+--------------------------------------------------------
+
+If you accidentally committed sensitive data (like a private key), please follow the instructions in [Secure-Repo.md](Secure-Repo.md) to remove it from your Git history.
