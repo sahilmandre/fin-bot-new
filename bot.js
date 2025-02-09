@@ -76,7 +76,8 @@ bot.onText(/\/instructions/, (msg) => {
       "/removelastentry - Remove the last entry\n" +
       "/setbudget <amount> - Set a custom budget (stored in cell I1)\n" +
       "/export - Export all expenses as a CSV file\n" +
-      "/category <category> - Filter spending by category. To get result for a specific category, e.g., /category Food  \n"
+      "/category <category> - Filter spending by category. To get result for a specific category, e.g., /category Food  \n" +
+      "/summary - Get a summary of your expenses. To get a specific summary, e.g., /summary daily/weekly/monthly or /summary custom 2023-07-01 2023-07-31 \n"
   );
 });
 
@@ -110,12 +111,12 @@ bot.onText(/\/setbudget (\d+)/, async (msg, match) => {
 
 // Handle invalid commands
 bot.onText(
-  /\/(?!start|instructions|lastentry|view|removelastentry|setbudget|export|category).*/,
+  /\/(?!start|instructions|lastentry|view|removelastentry|setbudget|export|category|summary).*/,
   (msg) => {
     const chatId = msg.chat.id;
     bot.sendMessage(
       chatId,
-      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view, /removelastentry, or /setbudget."
+      "Sorry, I didn't understand that. Please use one of the following commands: /start, /instructions, /lastentry, /view, /removelastentry, /setbudget or /summary."
     );
   }
 );
@@ -322,6 +323,124 @@ bot.onText(/^\/category(?:\s+(.+))?$/, async (msg, match) => {
     bot.sendMessage(
       chatId,
       "There was an error fetching category data. Please try again later."
+    );
+  }
+});
+
+// NEW FEATURE: /summary
+// Usage examples:
+//   /summary daily
+//   /summary weekly
+//   /summary monthly
+//   /summary custom 2023-07-01 2023-07-31
+bot.onText(/\/summary(?:\s+(.*))?$/, async (msg, match) => {
+  const chatId = msg.chat.id;
+
+  // Check if any arguments were provided.
+  if (!match[1] || match[1].trim() === "") {
+    bot.sendMessage(
+      chatId,
+      "Usage: /summary [daily|weekly|monthly|custom YYYY-MM-DD YYYY-MM-DD]"
+    );
+    return;
+  }
+
+  const args = match[1].trim().split(/\s+/);
+  let startDate, endDate;
+  const period = args[0].toLowerCase();
+  const now = new Date();
+
+  if (period === "daily") {
+    // Today's start and end (next day)
+    startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  } else if (period === "weekly") {
+    // Assume week starts on Monday
+    const dayOfWeek = now.getDay(); // Sunday=0, Monday=1, ..., Saturday=6
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    startDate = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() + mondayOffset
+    );
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 7);
+  } else if (period === "monthly") {
+    // Current month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  } else if (period === "custom") {
+    if (args.length < 3) {
+      bot.sendMessage(
+        chatId,
+        "Usage for custom period: /summary custom YYYY-MM-DD YYYY-MM-DD"
+      );
+      return;
+    }
+    const startInput = args[1];
+    const endInput = args[2];
+    startDate = new Date(startInput);
+    endDate = new Date(endInput);
+    // Include the full end date by setting endDate to the next day
+    endDate.setDate(endDate.getDate() + 1);
+    if (isNaN(startDate) || isNaN(endDate)) {
+      bot.sendMessage(chatId, "Invalid date format. Please use YYYY-MM-DD.");
+      return;
+    }
+  } else {
+    bot.sendMessage(
+      chatId,
+      "Invalid period specified. Use daily, weekly, monthly, or custom."
+    );
+    return;
+  }
+
+  try {
+    // Retrieve all entries from Google Sheets
+    const entries = await getAllEntriesFromSheet();
+    // Filter entries within the specified date range.
+    // Note: The date stored is assumed to be parseable by the Date() constructor.
+    const filteredEntries = entries.filter((entry) => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= startDate && entryDate < endDate;
+    });
+    if (filteredEntries.length === 0) {
+      bot.sendMessage(
+        chatId,
+        "No expense entries found for the selected period."
+      );
+      return;
+    }
+    // Calculate total expense and category breakdown
+    let totalExpense = 0;
+    const categoryTotals = {};
+    filteredEntries.forEach((entry) => {
+      const amount = parseFloat(entry.amount) || 0;
+      totalExpense += amount;
+      const cat = (entry.category || "Uncategorized").toLowerCase();
+      if (!categoryTotals[cat]) {
+        categoryTotals[cat] = 0;
+      }
+      categoryTotals[cat] += amount;
+    });
+    // Build summary message
+    let message = `*Expense Summary (${period.toUpperCase()})*\n`;
+    message += `Period: ${startDate.toLocaleDateString()} to ${new Date(
+      endDate - 1
+    ).toLocaleDateString()}\n`;
+    message += `Total Expense: ₹${totalExpense.toFixed(2)}\n\n`;
+    message += "*Category Breakdown:*\n";
+    for (const cat in categoryTotals) {
+      const catTotal = categoryTotals[cat];
+      const percentage = ((catTotal / totalExpense) * 100).toFixed(2);
+      message += `- ${cat}: ₹${catTotal.toFixed(2)}  (${percentage}%)\n`;
+    }
+    bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+  } catch (error) {
+    console.error("Error generating summary report:", error);
+    bot.sendMessage(
+      chatId,
+      "Error generating the summary report. Please try again."
     );
   }
 });
