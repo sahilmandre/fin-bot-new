@@ -166,6 +166,38 @@ bot.onText(/\/removelastentry/, async (msg) => {
 });
 
 // Handle /view command
+// bot.onText(/\/view/, async (msg) => {
+//   const chatId = msg.chat.id;
+
+//   try {
+//     // Fetch all entries from the Google Sheet
+//     const entries = await getAllEntriesFromSheet();
+
+//     if (entries.length === 0) {
+//       bot.sendMessage(chatId, "No entries found.");
+//       return;
+//     }
+
+//     // Format the entries into a readable message
+//     let message = "📝 **Your Entries to the FinSamBot:**\n\n";
+//     entries.forEach((entry, index) => {
+//       message += `**${index + 1}**. Date: ${entry.date}, *Amount:* ${
+//         entry.amount
+//       }, *Category:* **${entry.category}**, *Username:* ${entry.username}\n\n`;
+//     });
+
+//     // Send the formatted message to the user
+//     bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+//   } catch (error) {
+//     console.error("Error fetching entries:", error);
+//     bot.sendMessage(
+//       chatId,
+//       "There was an error fetching your entries. Please try again."
+//     );
+//   }
+// });
+
+// Function to handle the /view command
 bot.onText(/\/view/, async (msg) => {
   const chatId = msg.chat.id;
 
@@ -178,16 +210,42 @@ bot.onText(/\/view/, async (msg) => {
       return;
     }
 
-    // Format the entries into a readable message
-    let message = "📝 **Your Entries to the FinSamBot:**\n\n";
-    entries.forEach((entry, index) => {
-      message += `**${index + 1}**. Date: ${entry.date}, *Amount:* ${
+    // Sort the entries by date in descending order (newest first)
+    entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    // Get the last 20 entries
+    const last20Entries = entries.slice(0, 20);
+
+    // Generate the message with the heading and the last 20 entries
+    let message = "Your last 20 spends:\n\n";
+    last20Entries.forEach((entry, index) => {
+      message += `${index + 1}. Date: ${entry.date}, Amount: ${
         entry.amount
-      }, *Category:* **${entry.category}**, *Username:* ${entry.username}\n\n`;
+      }, Category: ${entry.category}, Username: ${entry.username}\n\n`;
     });
 
+    // Split the message into multiple parts if necessary
+    const maxLength = 4096; // Maximum length allowed by Telegram
+    const parts = [];
+    let currentPart = "";
+
+    message.split("\n\n").forEach((part) => {
+      if (currentPart.length + part.length > maxLength) {
+        parts.push(currentPart);
+        currentPart = part + "\n\n";
+      } else {
+        currentPart += part + "\n\n";
+      }
+    });
+
+    if (currentPart.length > 0) {
+      parts.push(currentPart);
+    }
+
     // Send the formatted message to the user
-    bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+    for (const part of parts) {
+      bot.sendMessage(chatId, part, { parse_mode: "Markdown" });
+    }
   } catch (error) {
     console.error("Error fetching entries:", error);
     bot.sendMessage(
@@ -444,6 +502,135 @@ bot.onText(/\/summary(?:\s+(.*))?$/, async (msg, match) => {
     );
   }
 });
+
+// New Command: /split (with custom uneven splits)
+// Usage: /split <total_amount> <description> @user1:amount @user2:amount ...
+bot.onText(/\/split\s+(.+)/i, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const text = match[1].trim(); // Everything after "/split"
+  const tokens = text.split(/\s+/);
+
+  // There should be at least a total amount, a description, and one participant entry.
+  if (tokens.length < 3) {
+    bot.sendMessage(
+      chatId,
+      "Usage: /split <total_amount> <description> @user1:amount @user2:amount ..."
+    );
+    return;
+  }
+
+  // First token: total amount.
+  const totalAmount = parseFloat(tokens[0]);
+  if (isNaN(totalAmount)) {
+    bot.sendMessage(chatId, "Invalid total amount specified.");
+    return;
+  }
+
+  // Process the tokens after the amount.
+  // All tokens until the first token starting with '@' form the description.
+  let descriptionTokens = [];
+  let splitTokens = [];
+  for (let token of tokens.slice(1)) {
+    if (token.startsWith("@")) {
+      splitTokens.push(token);
+    } else {
+      if (splitTokens.length === 0) {
+        descriptionTokens.push(token);
+      } else {
+        // If mentions have already started, treat additional tokens as part of description.
+        descriptionTokens.push(token);
+      }
+    }
+  }
+
+  if (splitTokens.length === 0) {
+    bot.sendMessage(
+      chatId,
+      "Please specify at least one participant with a custom split amount (e.g., @alice:30)."
+    );
+    return;
+  }
+
+  const description = descriptionTokens.join(" ");
+
+  // Parse each participant token, expecting the format: @username:amount
+  let splitData = [];
+  let sumSplit = 0;
+  for (let token of splitTokens) {
+    // Remove the "@" sign and split on the colon.
+    const parts = token.slice(1).split(":");
+    if (parts.length !== 2) {
+      bot.sendMessage(
+        chatId,
+        `Invalid format for participant: ${token}. Use @username:amount`
+      );
+      return;
+    }
+    const username = parts[0];
+    const share = parseFloat(parts[1]);
+    if (isNaN(share)) {
+      bot.sendMessage(chatId, `Invalid amount for participant: ${token}`);
+      return;
+    }
+    sumSplit += share;
+    splitData.push({ username, share });
+  }
+
+  // Validate that the sum of individual amounts matches the total expense.
+  if (Math.abs(sumSplit - totalAmount) > 0.01) {
+    bot.sendMessage(
+      chatId,
+      `The sum of individual amounts (₹${sumSplit.toFixed(
+        2
+      )}) does not match the total amount (₹${totalAmount.toFixed(
+        2
+      )}). Please check your entries.`
+    );
+    return;
+  }
+
+  // Record an expense entry for each participant.
+  // Here we use addEntryToSheetSilent() so that each entry is added without a separate confirmation.
+  const promises = splitData.map(({ username, share }) =>
+    addEntryToSheetSilent(share, `Split: ${description}`, username)
+  );
+
+  try {
+    await Promise.all(promises);
+    let summaryMsg = `Expense split of ₹${totalAmount.toFixed(
+      2
+    )} for "${description}" has been recorded.\nCustom shares:\n`;
+    splitData.forEach(({ username, share }) => {
+      summaryMsg += `@${username}: ₹${share.toFixed(2)}\n`;
+    });
+    bot.sendMessage(chatId, summaryMsg);
+  } catch (error) {
+    console.error("Error processing custom split expense:", error);
+    bot.sendMessage(
+      chatId,
+      "Error processing custom split expense. Please try again."
+    );
+  }
+});
+
+// Helper function to silently add an entry to Google Sheets (without sending confirmation)
+async function addEntryToSheetSilent(amount, category, username) {
+  try {
+    await authClient.authorize();
+    await sheets.spreadsheets.values.append({
+      auth: authClient,
+      spreadsheetId,
+      range: "Sheet1!A2:D2", // Appending to the next available row
+      valueInputOption: "USER_ENTERED",
+      resource: {
+        values: [[new Date().toLocaleString(), amount, category, username]],
+      },
+    });
+  } catch (error) {
+    console.error("Error adding split entry to sheet:", error);
+    throw error;
+  }
+}
 
 // ################ Functions ################
 
