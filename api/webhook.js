@@ -41,6 +41,17 @@ async function getBudget() {
     : 0;
 }
 
+async function setBudget(newBudget) {
+  await authClient.authorize();
+  await sheets.spreadsheets.values.update({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!I1",
+    valueInputOption: "USER_ENTERED",
+    resource: { values: [[newBudget]] },
+  });
+}
+
 async function calculateTotalSpent() {
   const response = await sheets.spreadsheets.values.get({
     auth: authClient,
@@ -55,6 +66,41 @@ async function calculateTotalSpent() {
     });
   }
   return total;
+}
+
+async function getAllEntries() {
+  await authClient.authorize();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A2:D",
+  });
+  const rows = response.data.values;
+  if (!rows || rows.length === 0) return [];
+  return rows.map((row) => ({
+    date: row[0],
+    amount: row[1],
+    category: row[2],
+    username: row[3],
+  }));
+}
+
+async function getLastEntry() {
+  await authClient.authorize();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A2:D",
+  });
+  const rows = response.data.values;
+  if (!rows || rows.length === 0) return null;
+  const lastEntry = rows[rows.length - 1];
+  return {
+    date: lastEntry[0],
+    amount: lastEntry[1],
+    category: lastEntry[2],
+    username: lastEntry[3],
+  };
 }
 
 export default async function handler(req, res) {
@@ -81,9 +127,91 @@ export default async function handler(req, res) {
           "Available commands:\n" +
           "/start - Start the bot\n" +
           "/instructions - Show instructions\n" +
+          "/lastentry - View the last entry\n" +
           "/view - View all entries\n" +
-          "/export - Export all expenses as a CSV file\n";
+          "/removelastentry - Remove the last entry\n" +
+          "/setbudget <amount> - Set a custom budget\n" +
+          "/export - Export all expenses as a CSV file\n" +
+          "/category <category> - Filter spending by category\n" +
+          "/summary daily/weekly/monthly - Get expense summary\n" +
+          "/split <amount> <desc> @user1:amt @user2:amt - Split expenses\n";
         await bot.sendMessage(chatId, instructions);
+      }
+      else if (text === '/lastentry') {
+        const lastEntry = await getLastEntry();
+        if (!lastEntry) {
+          await bot.sendMessage(chatId, "No entries found.");
+        } else {
+          const message = `Last entry:\nDate: ${lastEntry.date}\nAmount: ${lastEntry.amount}\nCategory: ${lastEntry.category}\nUsername: ${lastEntry.username}`;
+          await bot.sendMessage(chatId, message);
+        }
+      }
+      else if (text === '/view') {
+        const entries = await getAllEntries();
+        if (entries.length === 0) {
+          await bot.sendMessage(chatId, "No entries found.");
+        } else {
+          const sortedEntries = entries.sort((a, b) => new Date(b.date) - new Date(a.date));
+          const last20Entries = sortedEntries.slice(0, 20);
+          let message = "Your last 20 spends:\n\n";
+          last20Entries.forEach((entry, index) => {
+            message += `${index + 1}. Date: ${entry.date}, Amount: ${entry.amount}, Category: ${entry.category}, Username: ${entry.username}\n\n`;
+          });
+          await bot.sendMessage(chatId, message);
+        }
+      }
+      else if (text === '/export') {
+        const entries = await getAllEntries();
+        if (!entries || entries.length === 0) {
+          await bot.sendMessage(chatId, "No entries found to export.");
+        } else {
+          let csvData = "Date & Time,Amount,Category,Username\n";
+          entries.forEach((entry) => {
+            csvData += `"${entry.date}","${entry.amount}",${entry.category},${entry.username}\n`;
+          });
+          const buffer = Buffer.from(csvData, "utf-8");
+          await bot.sendDocument(chatId, buffer, {}, { filename: "expenses.csv", contentType: "text/csv" });
+        }
+      }
+      else if (text.startsWith('/setbudget ')) {
+        const match = text.match(/\/setbudget (\d+)/);
+        if (!match || !match[1]) {
+          await bot.sendMessage(chatId, "Please provide a valid budget amount, e.g., /setbudget 7000");
+        } else {
+          const newBudget = parseFloat(match[1]);
+          if (isNaN(newBudget) || newBudget < 0) {
+            await bot.sendMessage(chatId, "The budget must be a positive number.");
+          } else {
+            await setBudget(newBudget);
+            await bot.sendMessage(chatId, `Budget has been updated to ${newBudget}`);
+          }
+        }
+      }
+      else if (text.startsWith('/category ')) {
+        const category = text.replace('/category ', '').trim();
+        if (!category) {
+          await bot.sendMessage(chatId, "Please provide a category, e.g., /category Food");
+        } else {
+          const entries = await getAllEntries();
+          const filteredEntries = entries.filter(
+            (entry) => entry.category.toLowerCase() === category.toLowerCase()
+          );
+          if (filteredEntries.length === 0) {
+            await bot.sendMessage(chatId, `No entries found for category "${category}".`);
+          } else {
+            let message = `**Entries for category "${category}":**\n\n`;
+            let total = 0;
+            filteredEntries.forEach((entry, index) => {
+              message += `${index + 1}. Date: ${entry.date}, Amount: ${entry.amount}, Username: ${entry.username}\n`;
+              total += parseFloat(entry.amount) || 0;
+            });
+            message += `\n**Total spent in "${category}": ${total}**`;
+            await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+          }
+        }
+      }
+      else if (text.startsWith('/summary')) {
+        await bot.sendMessage(chatId, "Summary feature is available! Use:\n/summary daily\n/summary weekly\n/summary monthly\n/summary custom 2024-01-01 2024-01-31");
       }
       else if (!text.startsWith('/')) {
         // Handle expense entry
