@@ -2,6 +2,16 @@ const express = require("express");
 const config = require("./config/config");
 
 const app = express();
+app.use(express.json());
+
+// Webhook endpoint for Telegram
+app.post('/webhook', (req, res) => {
+  const { botService } = require('./bot-instance');
+  if (botService) {
+    botService.processUpdate(req.body);
+  }
+  res.sendStatus(200);
+});
 
 app.get("/", (req, res) => {
   res.send(`

@@ -3,7 +3,23 @@ const config = require("../config/config");
 
 class TelegramBotService {
   constructor() {
-    this.bot = new TelegramBot(config.telegram.token, { polling: true });
+    // Use webhook for serverless, polling for local
+    const useWebhook = process.env.VERCEL || process.env.NODE_ENV === 'production';
+    this.bot = new TelegramBot(config.telegram.token, { polling: !useWebhook });
+    this.useWebhook = useWebhook;
+  }
+
+  async setWebhook(url) {
+    if (this.useWebhook) {
+      await this.bot.setWebHook(`${url}/webhook`);
+      console.log('Webhook set successfully');
+    }
+  }
+
+  processUpdate(update) {
+    if (this.useWebhook) {
+      this.bot.processUpdate(update);
+    }
   }
 
   sendMessage(chatId, message, options = {}) {

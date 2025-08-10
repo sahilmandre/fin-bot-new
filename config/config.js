@@ -19,5 +19,6 @@ module.exports = {
     defaultBudget: 6000,
     sheetRange: "Sheet1!A2:D",
     maxMessageLength: 4096,
+    webhookUrl: process.env.WEBHOOK_URL || process.env.VERCEL_URL,
   },
 };
