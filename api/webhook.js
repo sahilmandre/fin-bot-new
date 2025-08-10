@@ -103,6 +103,42 @@ async function getLastEntry() {
   };
 }
 
+async function deleteLastEntry() {
+  await authClient.authorize();
+  const response = await sheets.spreadsheets.values.get({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    range: "Sheet1!A2:D",
+  });
+  const rows = response.data.values;
+  if (!rows || rows.length === 0) throw new Error("No entries found.");
+  
+  const lastRowIndex = rows.length + 1;
+  await sheets.spreadsheets.batchUpdate({
+    auth: authClient,
+    spreadsheetId: process.env.GOOGLE_SHEET_ID,
+    resource: {
+      requests: [{
+        deleteDimension: {
+          range: {
+            sheetId: 0,
+            dimension: "ROWS",
+            startIndex: lastRowIndex - 1,
+            endIndex: lastRowIndex,
+          },
+        },
+      }],
+    },
+  });
+  
+  return {
+    date: rows[rows.length - 1][0],
+    amount: rows[rows.length - 1][1],
+    category: rows[rows.length - 1][2],
+    username: rows[rows.length - 1][3],
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -210,8 +246,26 @@ export default async function handler(req, res) {
           }
         }
       }
+      else if (text === '/removelastentry') {
+        try {
+          const removedEntry = await deleteLastEntry();
+          const message = `✅ Last entry removed:\n\nDate: ${removedEntry.date}\nAmount: ${removedEntry.amount}\nCategory: ${removedEntry.category}\nUsername: ${removedEntry.username}`;
+          await bot.sendMessage(chatId, message);
+        } catch (error) {
+          await bot.sendMessage(chatId, "There was an error removing the last entry. Please try again.");
+        }
+      }
+      else if (text === '/setbudget') {
+        await bot.sendMessage(chatId, "Please provide a budget amount. Usage: /setbudget 5000");
+      }
+      else if (text === '/category') {
+        await bot.sendMessage(chatId, "Please provide a category. Usage: /category Food");
+      }
       else if (text.startsWith('/summary')) {
         await bot.sendMessage(chatId, "Summary feature is available! Use:\n/summary daily\n/summary weekly\n/summary monthly\n/summary custom 2024-01-01 2024-01-31");
+      }
+      else if (text.startsWith('/')) {
+        await bot.sendMessage(chatId, "Sorry, I didn't understand that command. Use /instructions to see all available commands.");
       }
       else if (!text.startsWith('/')) {
         // Handle expense entry
