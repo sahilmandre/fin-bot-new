@@ -1,2 +1,7 @@
 node_modules
 .env
+
+# Cleanup documentation (temporary)
+CLEANUP_SUMMARY.md
+FINAL_CLEANUP.md
+PROJECT_STATUS.md
