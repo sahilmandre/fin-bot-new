@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon bot.js",
     "show:users": "node scripts/showAllUsers.js",
-    "check:chatids": "node scripts/checkChatIds.js"
+    "check:chatids": "node scripts/checkChatIds.js",
+    "set:webhook": "node set-webhook.js"
   },
   "keywords": [],
   "author": "",

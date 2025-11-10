@@ -1,164 +1,183 @@
 const TelegramBot = require("node-telegram-bot-api");
-const { google } = require("googleapis");
+const mongoose = require("mongoose");
 
 // Initialize bot without polling for serverless
 const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN);
 
-// Google Sheets setup
-const key = process.env.GOOGLE_PRIVATE_KEY;
-const private_key = key.includes("\\n") ? key.replace(/\\n/g, "\n") : key;
-const sheets = google.sheets("v4");
-const authClient = new google.auth.JWT({
-  email: process.env.GOOGLE_CLIENT_EMAIL,
-  key: private_key,
-  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
-});
+// MongoDB Models
+const transactionSchema = new mongoose.Schema(
+  {
+    date: { type: Date, default: Date.now, required: true },
+    amount: { type: Number, required: true, min: 0 },
+    category: { type: String, required: true, trim: true },
+    username: { type: String, required: true, trim: true },
+    chatId: { type: Number, required: true },
+    description: { type: String, trim: true },
+  },
+  { timestamps: true }
+);
+
+const budgetSchema = new mongoose.Schema(
+  {
+    chatId: { type: Number, required: true },
+    amount: { type: Number, required: true, min: 0 },
+    period: {
+      type: String,
+      enum: ["monthly", "weekly", "daily"],
+      default: "monthly",
+    },
+    startDate: { type: Date, default: Date.now },
+    username: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+transactionSchema.index({ chatId: 1, date: -1 });
+budgetSchema.index({ chatId: 1 }, { unique: true });
+
+const Transaction =
+  mongoose.models.Transaction ||
+  mongoose.model("Transaction", transactionSchema);
+const Budget = mongoose.models.Budget || mongoose.model("Budget", budgetSchema);
+
+// MongoDB connection
+let cachedDb = null;
+
+async function connectToDatabase() {
+  if (cachedDb && mongoose.connection.readyState === 1) {
+    return cachedDb;
+  }
+
+  const db = await mongoose.connect(process.env.MONGODB_URI);
+  cachedDb = db;
+  return db;
+}
 
 // Helper functions
-async function addEntry(amount, description, username) {
-  await authClient.authorize();
-  await sheets.spreadsheets.values.append({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!A2:D2",
-    valueInputOption: "USER_ENTERED",
-    resource: {
-      values: [[new Date().toLocaleString(), amount, description, username]],
-    },
+async function addEntry(amount, description, username, chatId) {
+  await connectToDatabase();
+  const transaction = new Transaction({
+    amount: parseFloat(amount),
+    category: description,
+    username: username,
+    chatId: chatId,
+    description: description,
   });
+  await transaction.save();
 }
 
-async function getBudget() {
-  await authClient.authorize();
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!I1",
-  });
-  const values = response.data.values;
-  return values && values.length > 0 && values[0].length > 0 
-    ? parseFloat(values[0][0]) || 0 
-    : 0;
+async function getBudget(chatId) {
+  await connectToDatabase();
+  const budget = await Budget.findOne({ chatId });
+  return budget ? budget.amount : 6000; // Default budget
 }
 
-async function setBudget(newBudget) {
-  await authClient.authorize();
-  await sheets.spreadsheets.values.update({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!I1",
-    valueInputOption: "USER_ENTERED",
-    resource: { values: [[newBudget]] },
-  });
+async function setBudget(newBudget, chatId, username) {
+  await connectToDatabase();
+  await Budget.findOneAndUpdate(
+    { chatId },
+    { amount: newBudget, username: username, startDate: new Date() },
+    { upsert: true, new: true }
+  );
 }
 
-async function calculateTotalSpent() {
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!B:B",
-  });
-  const values = response.data.values;
-  let total = 0;
-  if (values) {
-    values.forEach((row) => {
-      total += parseFloat(row[0]) || 0;
-    });
-  }
-  return total;
+async function calculateTotalSpent(chatId) {
+  await connectToDatabase();
+  const result = await Transaction.aggregate([
+    { $match: { chatId } },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+  return result.length > 0 ? result[0].total : 0;
 }
 
-async function getAllEntries() {
-  await authClient.authorize();
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!A2:D",
-  });
-  const rows = response.data.values;
-  if (!rows || rows.length === 0) return [];
-  return rows.map((row) => ({
-    date: row[0],
-    amount: row[1],
-    category: row[2],
-    username: row[3],
+async function getAllEntries(chatId) {
+  await connectToDatabase();
+  const transactions = await Transaction.find({ chatId })
+    .sort({ createdAt: -1 })
+    .limit(20);
+
+  return transactions.map((t) => ({
+    date: t.date.toLocaleString(),
+    amount: t.amount.toString(),
+    category: t.category,
+    username: t.username,
   }));
 }
 
-async function getLastEntry() {
-  await authClient.authorize();
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!A2:D",
+async function getLastEntry(chatId) {
+  await connectToDatabase();
+  const transaction = await Transaction.findOne({ chatId }).sort({
+    createdAt: -1,
   });
-  const rows = response.data.values;
-  if (!rows || rows.length === 0) return null;
-  const lastEntry = rows[rows.length - 1];
+
+  if (!transaction) return null;
+
   return {
-    date: lastEntry[0],
-    amount: lastEntry[1],
-    category: lastEntry[2],
-    username: lastEntry[3],
+    date: transaction.date.toLocaleString(),
+    amount: transaction.amount.toString(),
+    category: transaction.category,
+    username: transaction.username,
   };
 }
 
-async function deleteLastEntry() {
-  await authClient.authorize();
-  const response = await sheets.spreadsheets.values.get({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Sheet1!A2:D",
+async function deleteLastEntry(chatId) {
+  await connectToDatabase();
+  const transaction = await Transaction.findOne({ chatId }).sort({
+    createdAt: -1,
   });
-  const rows = response.data.values;
-  if (!rows || rows.length === 0) throw new Error("No entries found.");
-  
-  const lastRowIndex = rows.length + 1;
-  await sheets.spreadsheets.batchUpdate({
-    auth: authClient,
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    resource: {
-      requests: [{
-        deleteDimension: {
-          range: {
-            sheetId: 0,
-            dimension: "ROWS",
-            startIndex: lastRowIndex - 1,
-            endIndex: lastRowIndex,
-          },
-        },
-      }],
-    },
-  });
-  
-  return {
-    date: rows[rows.length - 1][0],
-    amount: rows[rows.length - 1][1],
-    category: rows[rows.length - 1][2],
-    username: rows[rows.length - 1][3],
+
+  if (!transaction) throw new Error("No entries found.");
+
+  const deletedEntry = {
+    date: transaction.date.toLocaleString(),
+    amount: transaction.amount.toString(),
+    category: transaction.category,
+    username: transaction.username,
   };
+
+  await Transaction.findByIdAndDelete(transaction._id);
+  return deletedEntry;
+}
+
+async function getEntriesByCategory(category, chatId) {
+  await connectToDatabase();
+  const transactions = await Transaction.find({
+    chatId,
+    category: new RegExp(category, "i"),
+  }).sort({ createdAt: -1 });
+
+  return transactions.map((t) => ({
+    date: t.date.toLocaleString(),
+    amount: t.amount.toString(),
+    category: t.category,
+    username: t.username,
+  }));
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
     const update = req.body;
-    
+
     if (update.message) {
       const msg = update.message;
       const chatId = msg.chat.id;
       const text = msg.text;
       const username = msg.chat.username || msg.chat.first_name || "Unknown";
 
+      console.log(`📱 Message from Chat ID: ${chatId} (${username})`);
+
       // Handle commands
-      if (text === '/start') {
-        await bot.sendMessage(chatId, 'Welcome! Send me the amount and what it was spent on, like this: "100 Grocery".');
-      }
-      else if (text === '/instructions') {
-        const instructions = 
+      if (text === "/start") {
+        await bot.sendMessage(
+          chatId,
+          'Welcome! Send me the amount and what it was spent on, like this: "100 Grocery".'
+        );
+      } else if (text === "/instructions") {
+        const instructions =
           "To add an entry, send me the amount and what it was spent on, like this: '100 Grocery'.\n\n" +
           "Available commands:\n" +
           "/start - Start the bot\n" +
@@ -172,32 +191,29 @@ export default async function handler(req, res) {
           "/summary daily/weekly/monthly - Get expense summary\n" +
           "/split <amount> <desc> @user1:amt @user2:amt - Split expenses\n";
         await bot.sendMessage(chatId, instructions);
-      }
-      else if (text === '/lastentry') {
-        const lastEntry = await getLastEntry();
+      } else if (text === "/lastentry") {
+        const lastEntry = await getLastEntry(chatId);
         if (!lastEntry) {
           await bot.sendMessage(chatId, "No entries found.");
         } else {
           const message = `Last entry:\nDate: ${lastEntry.date}\nAmount: ${lastEntry.amount}\nCategory: ${lastEntry.category}\nUsername: ${lastEntry.username}`;
           await bot.sendMessage(chatId, message);
         }
-      }
-      else if (text === '/view') {
-        const entries = await getAllEntries();
+      } else if (text === "/view") {
+        const entries = await getAllEntries(chatId);
         if (entries.length === 0) {
           await bot.sendMessage(chatId, "No entries found.");
         } else {
-          const sortedEntries = entries.sort((a, b) => new Date(b.date) - new Date(a.date));
-          const last20Entries = sortedEntries.slice(0, 20);
           let message = "Your last 20 spends:\n\n";
-          last20Entries.forEach((entry, index) => {
-            message += `${index + 1}. Date: ${entry.date}, Amount: ${entry.amount}, Category: ${entry.category}, Username: ${entry.username}\n\n`;
+          entries.forEach((entry, index) => {
+            message += `${index + 1}. Date: ${entry.date}, Amount: ${
+              entry.amount
+            }, Category: ${entry.category}, Username: ${entry.username}\n\n`;
           });
           await bot.sendMessage(chatId, message);
         }
-      }
-      else if (text === '/export') {
-        const entries = await getAllEntries();
+      } else if (text === "/export") {
+        const entries = await getAllEntries(chatId);
         if (!entries || entries.length === 0) {
           await bot.sendMessage(chatId, "No entries found to export.");
         } else {
@@ -206,93 +222,123 @@ export default async function handler(req, res) {
             csvData += `"${entry.date}","${entry.amount}",${entry.category},${entry.username}\n`;
           });
           const buffer = Buffer.from(csvData, "utf-8");
-          await bot.sendDocument(chatId, buffer, {}, { filename: "expenses.csv", contentType: "text/csv" });
+          await bot.sendDocument(
+            chatId,
+            buffer,
+            {},
+            { filename: "expenses.csv", contentType: "text/csv" }
+          );
         }
-      }
-      else if (text.startsWith('/setbudget ')) {
+      } else if (text.startsWith("/setbudget ")) {
         const match = text.match(/\/setbudget (\d+)/);
         if (!match || !match[1]) {
-          await bot.sendMessage(chatId, "Please provide a valid budget amount, e.g., /setbudget 7000");
+          await bot.sendMessage(
+            chatId,
+            "Please provide a valid budget amount, e.g., /setbudget 7000"
+          );
         } else {
           const newBudget = parseFloat(match[1]);
           if (isNaN(newBudget) || newBudget < 0) {
-            await bot.sendMessage(chatId, "The budget must be a positive number.");
+            await bot.sendMessage(
+              chatId,
+              "The budget must be a positive number."
+            );
           } else {
-            await setBudget(newBudget);
-            await bot.sendMessage(chatId, `Budget has been updated to ${newBudget}`);
+            await setBudget(newBudget, chatId, username);
+            await bot.sendMessage(
+              chatId,
+              `Budget has been updated to ${newBudget}`
+            );
           }
         }
-      }
-      else if (text.startsWith('/category ')) {
-        const category = text.replace('/category ', '').trim();
+      } else if (text.startsWith("/category ")) {
+        const category = text.replace("/category ", "").trim();
         if (!category) {
-          await bot.sendMessage(chatId, "Please provide a category, e.g., /category Food");
-        } else {
-          const entries = await getAllEntries();
-          const filteredEntries = entries.filter(
-            (entry) => entry.category.toLowerCase() === category.toLowerCase()
+          await bot.sendMessage(
+            chatId,
+            "Please provide a category, e.g., /category Food"
           );
-          if (filteredEntries.length === 0) {
-            await bot.sendMessage(chatId, `No entries found for category "${category}".`);
+        } else {
+          const entries = await getEntriesByCategory(category, chatId);
+          if (entries.length === 0) {
+            await bot.sendMessage(
+              chatId,
+              `No entries found for category "${category}".`
+            );
           } else {
             let message = `**Entries for category "${category}":**\n\n`;
             let total = 0;
-            filteredEntries.forEach((entry, index) => {
-              message += `${index + 1}. Date: ${entry.date}, Amount: ${entry.amount}, Username: ${entry.username}\n`;
+            entries.forEach((entry, index) => {
+              message += `${index + 1}. Date: ${entry.date}, Amount: ${
+                entry.amount
+              }, Username: ${entry.username}\n`;
               total += parseFloat(entry.amount) || 0;
             });
             message += `\n**Total spent in "${category}": ${total}**`;
             await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
           }
         }
-      }
-      else if (text === '/removelastentry') {
+      } else if (text === "/removelastentry") {
         try {
-          const removedEntry = await deleteLastEntry();
+          const removedEntry = await deleteLastEntry(chatId);
           const message = `✅ Last entry removed:\n\nDate: ${removedEntry.date}\nAmount: ${removedEntry.amount}\nCategory: ${removedEntry.category}\nUsername: ${removedEntry.username}`;
           await bot.sendMessage(chatId, message);
         } catch (error) {
-          await bot.sendMessage(chatId, "There was an error removing the last entry. Please try again.");
+          await bot.sendMessage(
+            chatId,
+            "There was an error removing the last entry. Please try again."
+          );
         }
-      }
-      else if (text === '/setbudget') {
-        await bot.sendMessage(chatId, "Please provide a budget amount. Usage: /setbudget 5000");
-      }
-      else if (text === '/category') {
-        await bot.sendMessage(chatId, "Please provide a category. Usage: /category Food");
-      }
-      else if (text.startsWith('/summary')) {
-        await bot.sendMessage(chatId, "Summary feature is available! Use:\n/summary daily\n/summary weekly\n/summary monthly\n/summary custom 2024-01-01 2024-01-31");
-      }
-      else if (text.startsWith('/')) {
-        await bot.sendMessage(chatId, "Sorry, I didn't understand that command. Use /instructions to see all available commands.");
-      }
-      else if (!text.startsWith('/')) {
+      } else if (text === "/setbudget") {
+        await bot.sendMessage(
+          chatId,
+          "Please provide a budget amount. Usage: /setbudget 5000"
+        );
+      } else if (text === "/category") {
+        await bot.sendMessage(
+          chatId,
+          "Please provide a category. Usage: /category Food"
+        );
+      } else if (text.startsWith("/summary")) {
+        await bot.sendMessage(
+          chatId,
+          "Summary feature is available! Use:\n/summary daily\n/summary weekly\n/summary monthly\n/summary custom 2024-01-01 2024-01-31"
+        );
+      } else if (text.startsWith("/")) {
+        await bot.sendMessage(
+          chatId,
+          "Sorry, I didn't understand that command. Use /instructions to see all available commands."
+        );
+      } else if (!text.startsWith("/")) {
         // Handle expense entry
         const regex = /^(\d+)\s+(.+)$/;
         const match = text.match(regex);
-        
+
         if (match) {
           const amount = match[1];
           const description = match[2];
-          
-          await addEntry(amount, description, username);
-          const currentBudget = await getBudget();
-          const totalSpent = await calculateTotalSpent();
+
+          await addEntry(amount, description, username, chatId);
+          const currentBudget = await getBudget(chatId);
+          const totalSpent = await calculateTotalSpent(chatId);
           const remainingAmount = currentBudget - totalSpent;
-          
-          await bot.sendMessage(chatId, 
+
+          await bot.sendMessage(
+            chatId,
             `Entry added for ${description} by ${username}!\nTotal Spent: ${totalSpent}\nLast Amount: ${amount}\nRemaining Amount: ${remainingAmount}`
           );
         } else {
-          await bot.sendMessage(chatId, 'Please send the amount and description in the format: "100 Grocery".');
+          await bot.sendMessage(
+            chatId,
+            'Please send the amount and description in the format: "100 Grocery".'
+          );
         }
       }
     }
 
     res.status(200).json({ ok: true });
   } catch (error) {
-    console.error('Webhook error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("Webhook error:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 }
