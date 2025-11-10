@@ -35,7 +35,17 @@ class TelegramBotService {
   }
 
   on(event, callback) {
-    this.bot.on(event, callback);
+    this.bot.on(event, (msg) => {
+      // Log chatId for debugging
+      if (msg.chat && msg.chat.id) {
+        console.log(
+          `📱 Message from Chat ID: ${msg.chat.id} (${
+            msg.chat.first_name || "Unknown"
+          })`
+        );
+      }
+      callback(msg);
+    });
   }
 
   splitMessage(message) {

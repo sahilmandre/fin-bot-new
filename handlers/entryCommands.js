@@ -16,7 +16,7 @@ class EntryCommandsHandler {
   async handleLastEntry(msg) {
     const chatId = msg.chat.id;
     try {
-      const lastEntry = await this.sheets.getLastEntry();
+      const lastEntry = await this.sheets.getLastEntry(chatId);
       if (!lastEntry) {
         this.bot.sendMessage(chatId, "No entries found.");
         return;
@@ -32,7 +32,7 @@ class EntryCommandsHandler {
   async handleRemoveLastEntry(msg) {
     const chatId = msg.chat.id;
     try {
-      const removedEntry = await this.sheets.deleteLastEntry();
+      const removedEntry = await this.sheets.deleteLastEntry(chatId);
       const message = MessageFormatter.formatRemovedEntry(removedEntry);
       this.bot.sendMessage(chatId, message);
     } catch (error) {
@@ -44,7 +44,7 @@ class EntryCommandsHandler {
   async handleView(msg) {
     const chatId = msg.chat.id;
     try {
-      const entries = await this.sheets.getAllEntries();
+      const entries = await this.sheets.getAllEntries(chatId);
       if (entries.length === 0) {
         this.bot.sendMessage(chatId, "No entries found.");
         return;
@@ -82,9 +82,9 @@ class EntryCommandsHandler {
 
   async addEntryToSheet(chatId, amount, description, username) {
     try {
-      await this.sheets.addEntry(amount, description, username);
-      const currentBudget = await this.sheets.getBudget();
-      const totalSpent = await this.sheets.calculateTotalSpent();
+      await this.sheets.addEntry(amount, description, username, chatId);
+      const currentBudget = await this.sheets.getBudget(chatId);
+      const totalSpent = await this.sheets.calculateTotalSpent(chatId);
       const remainingAmount = currentBudget - totalSpent;
 
       const message = MessageFormatter.formatEntryConfirmation(

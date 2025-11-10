@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon bot.js"
+    "start": "nodemon bot.js",
+    "show:users": "node scripts/showAllUsers.js",
+    "check:chatids": "node scripts/checkChatIds.js"
   },
   "keywords": [],
   "author": "",
@@ -13,7 +15,7 @@
   "dependencies": {
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "googleapis": "^144.0.0",
+    "mongoose": "^8.19.3",
     "node-telegram-bot-api": "^0.66.0"
   },
   "devDependencies": {

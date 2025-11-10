@@ -10,9 +10,13 @@ class BudgetCommandsHandler {
 
   async handleSetBudget(msg, match) {
     const chatId = msg.chat.id;
+    const username = msg.chat.username || msg.chat.first_name || "Unknown";
 
     if (!match || !match[1]) {
-      this.bot.sendMessage(chatId, "Please provide a valid budget amount, e.g., /setbudget 7000");
+      this.bot.sendMessage(
+        chatId,
+        "Please provide a valid budget amount, e.g., /setbudget 7000"
+      );
       return;
     }
 
@@ -23,7 +27,7 @@ class BudgetCommandsHandler {
     }
 
     try {
-      await this.sheets.updateBudget(newBudget);
+      await this.sheets.updateBudget(newBudget, chatId, username);
       this.bot.sendMessage(chatId, `Budget has been updated to ${newBudget}`);
     } catch (error) {
       console.error("Error updating budget:", error);

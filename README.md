@@ -1,144 +1,180 @@
 # Fin-Bot: Telegram Expense Tracker Bot
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Uptime Robot status](https://img.shields.io/uptimerobot/ratio/m788221149-7dba8df26b99d1e3a1833f0d.svg)](https://dashboard.uptimerobot.com/monitors/798540552)
 
-Fin-Bot is a Telegram bot designed to help you track your daily expenses effortlessly. With Fin-Bot, you can quickly add expense entries, view and filter your expenses by category, set and update a custom budget, export your data to CSV, and more—all while using Google Sheets as your storage backend.
+Fin-Bot is a Telegram bot designed to help you track your daily expenses effortlessly. With Fin-Bot, you can quickly add expense entries, view and filter your expenses by category, set and update a custom budget, export your data to CSV, and more—all powered by MongoDB for scalability and multi-user support.
 
-This project is open-source and is built using Node.js, Express, and the Google Sheets API. It is hosted on [Render](https://fin-bot-new.onrender.com/) and monitored via [UptimeRobot](https://dashboard.uptimerobot.com/monitors/798540552) to ensure maximum availability.
+This project is open-source and is built using Node.js, Express, MongoDB, and the Telegram Bot API.
 
-## Table of Contents
-- [Features](#features)
-- [Technologies Used](#technologies-used)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Bot Commands](#bot-commands)
-- [How It Works](#how-it-works)
-- [SEO & Accessibility](#seo--accessibility)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
-- [Demo & Uptime](#demo--uptime)
+## 🌟 Features
 
-#### Securely Removing Sensitive Data from Git History
-- [Secure-Repo.md](Secure-Repo.md)
+- **Multi-User Support** - Each user gets isolated data automatically
+- **Expense Tracking** - Add expenses with simple messages like `"100 Coffee"`
+- **Budget Management** - Set personal budgets and track remaining amounts
+- **Category Filtering** - Filter expenses by category
+- **Data Export** - Export your data as CSV files
+- **Summary Reports** - Daily, weekly, and monthly summaries
+- **Split Expenses** - Split bills among multiple users
+- **Group Support** - Use in personal chats or Telegram groups
+- **Scalable** - MongoDB backend handles unlimited users and transactions
 
-## Features
-- **Expense Entry:** Add expense entries simply by sending a message in the format `"100 Grocery"`.
-- **User Identification:** Each entry logs the Telegram username of the person who made the entry.
-- **View Entries:** Quickly view all entries or just the latest entry.
-- **Category Filtering:** Filter expenses by category using the `/category <category>` command.
-- **Budget Management:** Set and update a custom budget stored in Google Sheets (cell I1), with automatic remaining amount calculations.
-- **Data Export:** Export your expense data as a CSV file.
-- **Uptime Monitoring:** The bot is hosted on Render and monitored by UptimeRobot for maximum reliability.
+## 🚀 Technologies Used
 
-## Technologies Used
-- **Node.js** – JavaScript runtime environment.
-- **Express.js** – Web framework for Node.js.
-- **node-telegram-bot-api** – Library for interacting with the Telegram Bot API.
-- **Google Sheets API** – Used for data storage and retrieval.
-- **dotenv** – For environment variable management.
-- **Render** – Cloud platform used for deploying and running the bot.
-- **UptimeRobot** – Service used to monitor the uptime and performance of the bot.
+- **Node.js** - JavaScript runtime
+- **Express.js** - Web framework
+- **MongoDB** - Database for scalable storage
+- **Mongoose** - MongoDB ODM
+- **node-telegram-bot-api** - Telegram Bot API wrapper
+- **dotenv** - Environment variable management
 
-## Getting Started
+## 📋 Prerequisites
 
-### Prerequisites
-- **Node.js** (v14+ recommended)
-- A **Telegram Bot Token** from [BotFather](https://t.me/BotFather)
-- A **Google Cloud Project** with Google Sheets API enabled
-- A **Google Sheet** with:
-  - Columns A–D for expense entries: Date & Time, Amount, Category, Username.
-  - Cell I1 to store your custom budget (e.g., `6000`).
-  - Cell H1 as a label for the budget (e.g., `"Budget"`).
-- An account on **Render** (or any other preferred hosting platform).
+- Node.js (v14+ recommended)
+- MongoDB Atlas account (free tier) or local MongoDB
+- Telegram Bot Token from [BotFather](https://t.me/BotFather)
 
-### Installation
+## 🔧 Installation
+
 1. **Clone the Repository:**
-    ```bash
-    git clone https://github.com/sahilmandre/fin-bot.git
-    cd fin-bot
-    ```
+   ```bash
+   git clone https://github.com/sahilmandre/fin-bot.git
+   cd fin-bot
+   ```
 
 2. **Install Dependencies:**
-    ```bash
-    npm install
-    ```
+   ```bash
+   npm install
+   ```
 
-3. **Set Up Environment Variables:**
-   Create a `.env` file in the root directory with the following variables:
-    ```env
-    TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-    GOOGLE_PRIVATE_KEY="your_google_private_key"
-    GOOGLE_CLIENT_EMAIL=your_google_client_email
-    GOOGLE_SHEET_ID=your_google_sheet_id
-    PORT=3000  # or your preferred port
-    ```
-    > **Note:** For the `GOOGLE_PRIVATE_KEY`, ensure that newline characters are preserved. You may need to replace `\n` with actual newlines or handle it in your code.
+3. **Configure Environment:**
+   Create a `.env` file:
+   ```env
+   TELEGRAM_BOT_TOKEN=your_telegram_bot_token
+   MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/finbot
+   PORT=3000
+   ```
 
-4. **Run Locally or Deploy:**
-   - **Locally:**  
-     ```bash
-     npm start
-     ```
-   - **Deploy on Render:**  
-     Connect your repository to Render and set the environment variables via the Render dashboard.
+4. **Start the Bot:**
+   ```bash
+   npm start
+   ```
 
-## Bot Commands
-Below is the list of available commands (ordered by usage priority):
+## 📱 Bot Commands
 
-- **/start** – Start the bot.
-- **/instructions** – Display instructions and list all available commands.
-- **/view** – View all expense entries.
-- **/lastentry** – View the most recent expense entry.
-- **/category `<category>`** – Filter expenses by category (e.g., `/category Food`).
-- **/export** – Export all expense data as a CSV file.
-- **/setbudget `<amount>`** – Set a custom budget (updates cell I1 in your Google Sheet).
-- **/removelastentry** – Remove the last expense entry.
+### Basic Commands
+- `/start` - Initialize the bot
+- `/instructions` - Show all available commands
 
-## How It Works
-- **Expense Entry:**  
-  Users send messages like `"100 Grocery"`, where `100` is the amount and `Grocery` is the expense category. The bot captures the current date, time, and the user’s Telegram username before appending the entry to a Google Sheet.
+### Expense Tracking
+- `100 Coffee` - Add expense (format: amount description)
+- `/view` - View all your entries
+- `/lastentry` - Show last entry
+- `/removelastentry` - Delete last entry
 
-- **Google Sheets Integration:**  
-  The bot uses the Google Sheets API to manage data. Expense entries are stored starting from row 2, while the budget is maintained in cell I1.
+### Budget Management
+- `/setbudget 5000` - Set your monthly budget
+- Budget automatically shows remaining amount
 
-- **Dynamic Budget Management:**  
-  Users can update the budget with the `/setbudget` command. The bot then calculates the remaining amount by subtracting the total expenses from the current budget.
+### Reports & Export
+- `/export` - Download CSV file
+- `/summary daily` - Daily summary
+- `/summary weekly` - Weekly summary
+- `/summary monthly` - Monthly summary
 
-- **Data Export and Filtering:**  
-  With the `/export` command, users can receive a CSV file containing all expense entries. The `/category` command filters entries based on the specified category, making data analysis easy.
+### Advanced Features
+- `/category Food` - Filter by category
+- `/split 200 Dinner @user1:100 @user2:100` - Split expenses
 
-## SEO & Accessibility
-- **SEO Optimized:**  
-  This README contains well-structured headings and relevant keywords such as “Telegram Expense Tracker Bot”, “Google Sheets API”, “Budget Management”, and “Node.js” to enhance search engine visibility.
-  
-- **Accessibility:**  
-  The documentation is designed to be clear and accessible for users and developers, with detailed instructions on setting up and deploying the project.
+## 👥 Multi-User Support
 
-## Contributing
-Contributions are welcome! If you have suggestions, bug fixes, or new features, please open an issue or submit a pull request.
+Each user automatically gets:
+- ✅ Isolated data (complete privacy)
+- ✅ Personal budget settings
+- ✅ Individual transaction history
+- ✅ Private reports and exports
 
-## License
+Works in:
+- Personal chats (private tracking)
+- Group chats (shared expenses)
+
+No configuration needed - just start using!
+
+## 📊 Admin Commands
+
+Monitor your bot:
+```bash
+npm run show:users      # View all users and stats
+npm run check:chatids   # Check chatIds in database
+```
+
+## 📚 Documentation
+
+Detailed documentation available in the `docs/` folder:
+- [Setup Guide](docs/SETUP_GUIDE.md) - Complete setup instructions
+- [Multi-User Guide](docs/MULTI_USER.md) - How multi-user works
+- [Admin Commands](docs/ADMIN_COMMANDS.md) - Monitoring and maintenance
+
+## 🏗️ Project Structure
+
+```
+fin-bot/
+├── config/          # Configuration files
+├── handlers/        # Command handlers
+├── models/          # MongoDB models
+├── services/        # Business logic services
+├── scripts/         # Utility scripts
+├── utils/           # Helper functions
+├── docs/            # Documentation
+├── bot.js           # Main entry point
+└── server.js        # Express server
+```
+
+## 🔐 Security
+
+- Environment variables for sensitive data
+- MongoDB authentication
+- User data isolation
+- No data sharing between users
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+1. Connect GitHub repo to Vercel
+2. Add environment variables
+3. Deploy
+
+### Other Platforms
+- Heroku
+- Railway
+- DigitalOcean
+- AWS
+
+## 🤝 Contributing
+
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## 📄 License
+
 This project is licensed under the [MIT License](LICENSE).
 
-## Contact
-Created by **Sahil Mandre**  
-[GitHub Profile](https://github.com/sahilmandre)
+## 👨‍💻 Author
 
-For any questions or feedback, please open an issue or reach out via GitHub.
+**Sahil Mandre**
+- GitHub: [@sahilmandre](https://github.com/sahilmandre)
+- Portfolio: [sahilmandre.vercel.app](https://portfolio-sahilmandre.vercel.app/)
 
-## Demo & Uptime
-- **Live Bot:** [https://fin-bot-new.onrender.com/](https://fin-bot-new.onrender.com/)
-- **Uptime Monitoring:** [UptimeRobot Dashboard](https://dashboard.uptimerobot.com/monitors/798540552)
-- **Creator's Portfolio:** [Sahil Mandre Portfolio](https://portfolio-sahilmandre.vercel.app/)
+## 🙏 Acknowledgments
+
+- Telegram Bot API
+- MongoDB Atlas
+- Node.js community
 
 ---
 
-*Happy Expense Tracking with Fin-Bot!*
+**Happy Expense Tracking with Fin-Bot!** 🎉
 
-## Securely Removing Sensitive Data from Git History
---------------------------------------------------------
-
-If you accidentally committed sensitive data (like a private key), please follow the instructions in [Secure-Repo.md](Secure-Repo.md) to remove it from your Git history.
+For detailed setup and usage instructions, check the [documentation](docs/).
