@@ -25,6 +25,9 @@ const sheetsService = new MongoService(); // Using MongoDB now!
 ].forEach((Handler) => new Handler(botService, sheetsService).register());
 
 // Set webhook for production
+// ⚠️ WARNING: Running this bot locally with polling will BREAK the webhook!
+// If webhook breaks, reset it with: npm run webhook:set
+// Check webhook status with: npm run webhook:check
 if (process.env.VERCEL || process.env.NODE_ENV === "production") {
   const webhookUrl =
     process.env.WEBHOOK_URL || "https://fin-bot-new.vercel.app";

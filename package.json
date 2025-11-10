@@ -10,7 +10,8 @@
     "start": "nodemon bot.js",
     "show:users": "node scripts/showAllUsers.js",
     "check:chatids": "node scripts/checkChatIds.js",
-    "set:webhook": "node set-webhook.js"
+    "webhook:set": "node scripts/setWebhook.js",
+    "webhook:check": "node scripts/checkWebhook.js"
   },
   "keywords": [],
   "author": "",

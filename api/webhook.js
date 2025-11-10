@@ -154,6 +154,59 @@ async function getEntriesByCategory(category, chatId) {
   }));
 }
 
+async function getMonthlyRemainingBudget(chatId, year, month) {
+  await connectToDatabase();
+
+  // Calculate month date range
+  const startDate = new Date(year, month, 1, 0, 0, 0);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+  // Get budget
+  const budget = await getBudget(chatId);
+
+  // Calculate total spent for the month
+  const result = await Transaction.aggregate([
+    {
+      $match: {
+        chatId: chatId,
+        date: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+      },
+    },
+    { $group: { _id: null, total: { $sum: "$amount" } } },
+  ]);
+
+  const totalSpent = result.length > 0 ? result[0].total : 0;
+  const remaining = budget - totalSpent;
+
+  // Get month name
+  const monthNames = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  const monthName = monthNames[month];
+
+  return {
+    budget,
+    totalSpent,
+    remaining,
+    monthName,
+    year,
+  };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -186,6 +239,7 @@ export default async function handler(req, res) {
           "/view - View all entries\n" +
           "/removelastentry - Remove the last entry\n" +
           "/setbudget <amount> - Set a custom budget\n" +
+          "/remaining - Check remaining budget for current month\n" +
           "/export - Export all expenses as a CSV file\n" +
           "/category <category> - Filter spending by category\n" +
           "/summary daily/weekly/monthly - Get expense summary\n" +
@@ -299,6 +353,44 @@ export default async function handler(req, res) {
           chatId,
           "Please provide a category. Usage: /category Food"
         );
+      } else if (text === "/remaining") {
+        try {
+          // Get current year and month
+          const now = new Date();
+          const year = now.getFullYear();
+          const month = now.getMonth();
+
+          // Get monthly remaining budget
+          const result = await getMonthlyRemainingBudget(chatId, year, month);
+
+          // Calculate percentage
+          const percentage =
+            result.budget > 0 ? (result.remaining / result.budget) * 100 : 0;
+
+          // Get status emoji
+          let emoji = "✅";
+          if (result.remaining <= 0) {
+            emoji = "🚫";
+          } else if (percentage < 20) {
+            emoji = "⚠️";
+          }
+
+          // Format message
+          const message =
+            `*${emoji} Budget Status - ${result.monthName} ${result.year}*\n\n` +
+            `💰 *Budget:* ${result.budget}\n` +
+            `💸 *Total Spent:* ${result.totalSpent}\n` +
+            `💵 *Remaining:* ${result.remaining}\n` +
+            `📊 *Remaining:* ${percentage.toFixed(1)}%`;
+
+          await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+        } catch (error) {
+          console.error("Error in /remaining command:", error);
+          await bot.sendMessage(
+            chatId,
+            "Error retrieving budget information. Please try again."
+          );
+        }
       } else if (text.startsWith("/summary")) {
         await bot.sendMessage(
           chatId,
