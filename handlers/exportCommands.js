@@ -1,66 +1,104 @@
+const DateUtils = require("../utils/dateUtils");
+const CSVGenerator = require("../utils/csvGenerator");
 const MessageFormatter = require("../utils/messageFormatter");
 
 class ExportCommandsHandler {
-  constructor(botService, sheetsService) {
+  constructor(botService, mongoService) {
     this.bot = botService;
-    this.sheets = sheetsService;
+    this.mongo = mongoService;
   }
 
   register() {
-    this.bot.onText(/\/export/, this.handleExport.bind(this));
-    this.bot.onText(/^\/category(?:\s+(.+))?$/, this.handleCategory.bind(this));
+    this.bot.onText(/\/export(?:\s+(.*))?$/, this.handleExport.bind(this));
   }
 
-  async handleExport(msg) {
+  async handleExport(msg, match) {
     const chatId = msg.chat.id;
-    try {
-      const entries = await this.sheets.getAllEntries();
-      if (!entries || entries.length === 0) {
-        this.bot.sendMessage(chatId, "No entries found to export.");
-        return;
-      }
+    const monthInput = match[1] ? match[1].trim() : null;
 
-      const csvData = MessageFormatter.formatCSV(entries);
-      const buffer = Buffer.from(csvData, "utf-8");
-      this.bot.sendDocument(
-        chatId,
-        buffer,
-        {},
-        { filename: "expenses.csv", contentType: "text/csv" }
-      );
+    try {
+      // Parse month input or default to current month
+      const { month, year } = this.parseMonthInput(monthInput);
+
+      // Generate month export
+      await this.generateMonthExport(chatId, year, month);
     } catch (error) {
-      console.error("Error exporting data:", error);
-      this.bot.sendMessage(chatId, "There was an error exporting the data. Please try again later.");
+      if (error.message === "Invalid month format") {
+        this.bot.sendMessage(
+          chatId,
+          "Invalid month format. Use: /export Jun or /export June or /export 6\n\n" +
+            "Examples:\n" +
+            "• /export (current month)\n" +
+            "• /export Nov\n" +
+            "• /export November\n" +
+            "• /export 11"
+        );
+      } else {
+        console.error("Error in /export command:", error);
+        this.bot.sendMessage(
+          chatId,
+          "Error generating export. Please try again."
+        );
+      }
     }
   }
 
-  async handleCategory(msg, match) {
-    const chatId = msg.chat.id;
+  parseMonthInput(monthStr) {
+    try {
+      return DateUtils.parseMonth(monthStr);
+    } catch (error) {
+      throw new Error("Invalid month format");
+    }
+  }
 
-    if (!match[1]) {
-      this.bot.sendMessage(chatId, "Please provide a category in the proper format, e.g., /category Food");
+  async generateMonthExport(chatId, year, month) {
+    // Get transactions for the month
+    const transactions = await this.mongo.getTransactionsByMonth(
+      chatId,
+      year,
+      month
+    );
+
+    // Get month name
+    const monthName = DateUtils.getMonthName(month);
+
+    // Handle empty transaction list
+    if (transactions.length === 0) {
+      this.bot.sendMessage(
+        chatId,
+        `No transactions found for ${monthName} ${year}`
+      );
       return;
     }
 
-    const categoryToFilter = match[1].trim();
+    // Generate CSV
+    const csvString = CSVGenerator.generateCSV(transactions);
+    const csvBuffer = CSVGenerator.createBuffer(csvString);
 
-    try {
-      const entries = await this.sheets.getAllEntries();
-      const filteredEntries = entries.filter(
-        (entry) => entry.category.toLowerCase() === categoryToFilter.toLowerCase()
-      );
+    // Get monthly stats for overview
+    const stats = await this.mongo.getMonthlyStats(chatId, year, month);
 
-      if (filteredEntries.length === 0) {
-        this.bot.sendMessage(chatId, `No entries found for category "${categoryToFilter}".`);
-        return;
+    // Format overview message
+    const overviewMessage = MessageFormatter.formatMonthOverview(
+      monthName,
+      year,
+      stats
+    );
+
+    // Send CSV file
+    const filename = `expenses_${monthName}_${year}.csv`;
+    await this.bot.sendDocument(
+      chatId,
+      csvBuffer,
+      {},
+      {
+        filename: filename,
+        contentType: "text/csv",
       }
+    );
 
-      const message = MessageFormatter.formatCategoryEntries(filteredEntries, categoryToFilter);
-      this.bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
-    } catch (error) {
-      console.error("Error filtering by category:", error);
-      this.bot.sendMessage(chatId, "There was an error fetching category data. Please try again later.");
-    }
+    // Send overview message
+    this.bot.sendMessage(chatId, overviewMessage, { parse_mode: "Markdown" });
   }
 }
 

@@ -10,9 +10,11 @@ This project is open-source and is built using Node.js, Express, MongoDB, and th
 
 - **Multi-User Support** - Each user gets isolated data automatically
 - **Expense Tracking** - Add expenses with simple messages like `"100 Coffee"`
-- **Budget Management** - Set personal budgets and track remaining amounts
+- **Monthly Budget Tracking** - Track budget on a monthly basis (day 1 to last day)
+- **Budget Status** - Check remaining budget with visual indicators (✅ ⚠️ 🚫)
+- **Month-Specific Exports** - Export any month's transactions with overview statistics
+- **Month Comparison** - Compare spending between two months
 - **Category Filtering** - Filter expenses by category
-- **Data Export** - Export your data as CSV files
 - **Summary Reports** - Daily, weekly, and monthly summaries
 - **Split Expenses** - Split bills among multiple users
 - **Group Support** - Use in personal chats or Telegram groups
@@ -73,10 +75,12 @@ This project is open-source and is built using Node.js, Express, MongoDB, and th
 
 ### Budget Management
 - `/setbudget 5000` - Set your monthly budget
-- Budget automatically shows remaining amount
+- `/remaining` - Check remaining budget for current month with status indicators
 
 ### Reports & Export
-- `/export` - Download CSV file
+- `/export` - Export current month's transactions with overview
+- `/export Nov` - Export specific month (Nov, November, or 11)
+- `/compare Oct Nov` - Compare spending between two months
 - `/summary daily` - Daily summary
 - `/summary weekly` - Weekly summary
 - `/summary monthly` - Monthly summary
