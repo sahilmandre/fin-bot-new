@@ -131,20 +131,22 @@ app.get("/", (req, res) => {
                 <div class="command-card">
                     <h3>Reports & Export</h3>
                     <p><code>/export</code> - Download CSV file</p>
+                    <p><code>/export Nov</code> - Export specific month</p>
                     <p><code>/summary daily</code> - Get expense summary</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Split Expenses</h3>
-                    <p><code>/split 200 Dinner @user1:100 @user2:100</code></p>
-                    <p>Split expenses among multiple users</p>
+                    <h3>Compare & Analyze</h3>
+                    <p><code>/compare Oct Nov</code> - Compare months</p>
+                    <p><code>/remaining</code> - Check budget status</p>
+                    <p><code>/category Food</code> - Filter by category</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Summary Options</h3>
-                    <p><code>/summary weekly</code> - Weekly report</p>
-                    <p><code>/summary monthly</code> - Monthly report</p>
-                    <p><code>/summary custom 2024-01-01 2024-01-31</code></p>
+                    <h3>Group Expenses</h3>
+                    <p>Add bot to a Telegram group to track shared expenses</p>
+                    <p>Everyone in the group can add and view expenses together</p>
+                    <p>Perfect for roommates, families, or teams!</p>
                 </div>
             </div>
         </div>

@@ -7,7 +7,6 @@ const RemainingCommandsHandler = require("./handlers/remainingCommands");
 const ExportCommandsHandler = require("./handlers/exportCommands");
 const CompareCommandsHandler = require("./handlers/compareCommands");
 const SummaryCommandsHandler = require("./handlers/summaryCommands");
-const SplitCommandsHandler = require("./handlers/splitCommands");
 
 // Initialize services and handlers with MongoDB
 const botService = new TelegramBotService();
@@ -20,7 +19,6 @@ const sheetsService = new MongoService(); // Using MongoDB now!
   ExportCommandsHandler,
   CompareCommandsHandler,
   SummaryCommandsHandler,
-  SplitCommandsHandler,
   BasicCommandsHandler, // Register last to handle invalid commands
 ].forEach((Handler) => new Handler(botService, sheetsService).register());
 

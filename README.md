@@ -16,8 +16,7 @@ This project is open-source and is built using Node.js, Express, MongoDB, and th
 - **Month Comparison** - Compare spending between two months
 - **Category Filtering** - Filter expenses by category
 - **Summary Reports** - Daily, weekly, and monthly summaries
-- **Split Expenses** - Split bills among multiple users
-- **Group Support** - Use in personal chats or Telegram groups
+- **Group Support** - Use in personal chats or Telegram groups for shared expenses
 - **Scalable** - MongoDB backend handles unlimited users and transactions
 
 ## 🚀 Technologies Used
@@ -87,7 +86,8 @@ This project is open-source and is built using Node.js, Express, MongoDB, and th
 
 ### Advanced Features
 - `/category Food` - Filter by category
-- `/split 200 Dinner @user1:100 @user2:100` - Split expenses
+- `/summary daily` - Get daily/weekly/monthly summaries
+- `/compare Oct Nov` - Compare spending between months
 
 ## 👥 Multi-User Support
 

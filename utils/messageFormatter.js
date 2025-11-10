@@ -69,15 +69,7 @@ class MessageFormatter {
     return message;
   }
 
-  static formatSplitSummary(totalAmount, description, splitData) {
-    let message = `Expense split of ₹${totalAmount.toFixed(
-      2
-    )} for "${description}" has been recorded.\nCustom shares:\n`;
-    splitData.forEach(({ username, share }) => {
-      message += `@${username}: ₹${share.toFixed(2)}\n`;
-    });
-    return message;
-  }
+
 
   static formatEntryConfirmation(
     description,

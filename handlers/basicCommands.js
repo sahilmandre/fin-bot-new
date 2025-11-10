@@ -8,7 +8,7 @@ class BasicCommandsHandler {
     this.bot.onText(/\/start/, this.handleStart.bind(this));
     this.bot.onText(/\/instructions/, this.handleInstructions.bind(this));
     this.bot.onText(
-      /\/(?!start|instructions|lastentry|view|removelastentry|setbudget|remaining|export|compare|category|summary|split).*/,
+      /\/(?!start|instructions|lastentry|view|removelastentry|setbudget|remaining|export|compare|category|summary).*/,
       this.handleInvalidCommand.bind(this)
     );
   }
@@ -36,7 +36,8 @@ class BasicCommandsHandler {
       "/export [month] - Export month transactions (e.g., /export Nov or /export for current month)\n" +
       "/compare <month1> <month2> - Compare spending between two months (e.g., /compare Oct Nov)\n" +
       "/category <category> - Filter spending by category (e.g., /category Food)\n" +
-      "/summary - Get expense summary (e.g., /summary daily/weekly/monthly or /summary custom 2023-07-01 2023-07-31)\n";
+      "/summary - Get expense summary (e.g., /summary daily/weekly/monthly or /summary custom 2023-07-01 2023-07-31)\n\n" +
+      "💡 Tip: Add this bot to a group chat to track shared expenses with friends or family!";
     
     this.bot.sendMessage(chatId, instructions);
   }

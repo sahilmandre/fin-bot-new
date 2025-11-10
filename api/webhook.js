@@ -352,8 +352,8 @@ export default async function handler(req, res) {
           "/export [month] - Export month transactions (e.g., /export Nov or /export for current month)\n" +
           "/compare <month1> <month2> - Compare spending between two months (e.g., /compare Oct Nov)\n" +
           "/category <category> - Filter spending by category\n" +
-          "/summary daily/weekly/monthly - Get expense summary\n" +
-          "/split <amount> <desc> @user1:amt @user2:amt - Split expenses\n";
+          "/summary daily/weekly/monthly - Get expense summary\n\n" +
+          "💡 Tip: Add this bot to a group chat to track shared expenses with friends or family!";
         await bot.sendMessage(chatId, instructions);
       } else if (text === "/lastentry") {
         const lastEntry = await getLastEntry(chatId);
