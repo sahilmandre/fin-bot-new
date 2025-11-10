@@ -154,25 +154,55 @@ async function getEntriesByCategory(category, chatId) {
   }));
 }
 
+// Utility functions for date parsing
+function parseMonth(monthStr) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+
+  if (!monthStr) {
+    return { month: now.getMonth(), year: currentYear };
+  }
+
+  const input = monthStr.trim().toLowerCase();
+  const monthNames = {
+    january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2,
+    april: 3, apr: 3, may: 4, june: 5, jun: 5, july: 6, jul: 6,
+    august: 7, aug: 7, september: 8, sep: 8, sept: 8,
+    october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11,
+  };
+
+  if (monthNames.hasOwnProperty(input)) {
+    return { month: monthNames[input], year: currentYear };
+  }
+
+  const monthNum = parseInt(input);
+  if (!isNaN(monthNum) && monthNum >= 1 && monthNum <= 12) {
+    return { month: monthNum - 1, year: currentYear };
+  }
+
+  throw new Error("Invalid month format");
+}
+
+function getMonthName(monthIndex) {
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+  return monthNames[monthIndex];
+}
+
 async function getMonthlyRemainingBudget(chatId, year, month) {
   await connectToDatabase();
 
-  // Calculate month date range
   const startDate = new Date(year, month, 1, 0, 0, 0);
   const endDate = new Date(year, month + 1, 0, 23, 59, 59);
-
-  // Get budget
   const budget = await getBudget(chatId);
 
-  // Calculate total spent for the month
   const result = await Transaction.aggregate([
     {
       $match: {
         chatId: chatId,
-        date: {
-          $gte: startDate,
-          $lte: endDate,
-        },
+        date: { $gte: startDate, $lte: endDate },
       },
     },
     { $group: { _id: null, total: { $sum: "$amount" } } },
@@ -180,31 +210,110 @@ async function getMonthlyRemainingBudget(chatId, year, month) {
 
   const totalSpent = result.length > 0 ? result[0].total : 0;
   const remaining = budget - totalSpent;
+  const monthName = getMonthName(month);
 
-  // Get month name
-  const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-  const monthName = monthNames[month];
+  return { budget, totalSpent, remaining, monthName, year };
+}
+
+async function getTransactionsByMonth(chatId, year, month) {
+  await connectToDatabase();
+
+  const startDate = new Date(year, month, 1, 0, 0, 0);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+
+  const transactions = await Transaction.find({
+    chatId: chatId,
+    date: { $gte: startDate, $lte: endDate },
+  }).sort({ date: -1 });
+
+  return transactions.map((t) => ({
+    date: t.date,
+    amount: t.amount,
+    category: t.category,
+    username: t.username,
+  }));
+}
+
+async function getMonthlyStats(chatId, year, month) {
+  await connectToDatabase();
+
+  const startDate = new Date(year, month, 1, 0, 0, 0);
+  const endDate = new Date(year, month + 1, 0, 23, 59, 59);
+  const budget = await getBudget(chatId);
+
+  const stats = await Transaction.aggregate([
+    {
+      $match: {
+        chatId: chatId,
+        date: { $gte: startDate, $lte: endDate },
+      },
+    },
+    {
+      $facet: {
+        categoryBreakdown: [
+          {
+            $group: {
+              _id: "$category",
+              total: { $sum: "$amount" },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { total: -1 } },
+        ],
+        overall: [
+          {
+            $group: {
+              _id: null,
+              totalSpent: { $sum: "$amount" },
+              transactionCount: { $sum: 1 },
+              avgTransaction: { $avg: "$amount" },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  const categoryBreakdown = stats[0].categoryBreakdown.map((cat) => ({
+    category: cat._id,
+    total: cat.total,
+    count: cat.count,
+  }));
+
+  const overall = stats[0].overall[0] || {
+    totalSpent: 0,
+    transactionCount: 0,
+    avgTransaction: 0,
+  };
 
   return {
+    totalSpent: overall.totalSpent,
+    transactionCount: overall.transactionCount,
+    avgTransaction: overall.avgTransaction,
+    categoryBreakdown,
     budget,
-    totalSpent,
-    remaining,
-    monthName,
-    year,
+    remaining: budget - overall.totalSpent,
   };
+}
+
+function generateCSV(transactions) {
+  if (!transactions || transactions.length === 0) {
+    return "Date,Amount,Category,Username\n";
+  }
+
+  let csv = "Date,Amount,Category,Username\n";
+  transactions.forEach((t) => {
+    const date = new Date(t.date).toLocaleString();
+    const category = String(t.category).includes(",")
+      ? `"${t.category}"`
+      : t.category;
+    const username = String(t.username).includes(",")
+      ? `"${t.username}"`
+      : t.username;
+    csv += `${date},${t.amount},${category},${username}\n`;
+  });
+
+  return csv;
 }
 
 export default async function handler(req, res) {
@@ -240,7 +349,8 @@ export default async function handler(req, res) {
           "/removelastentry - Remove the last entry\n" +
           "/setbudget <amount> - Set a custom budget\n" +
           "/remaining - Check remaining budget for current month\n" +
-          "/export - Export all expenses as a CSV file\n" +
+          "/export [month] - Export month transactions (e.g., /export Nov or /export for current month)\n" +
+          "/compare <month1> <month2> - Compare spending between two months (e.g., /compare Oct Nov)\n" +
           "/category <category> - Filter spending by category\n" +
           "/summary daily/weekly/monthly - Get expense summary\n" +
           "/split <amount> <desc> @user1:amt @user2:amt - Split expenses\n";
@@ -266,21 +376,68 @@ export default async function handler(req, res) {
           });
           await bot.sendMessage(chatId, message);
         }
-      } else if (text === "/export") {
-        const entries = await getAllEntries(chatId);
-        if (!entries || entries.length === 0) {
-          await bot.sendMessage(chatId, "No entries found to export.");
-        } else {
-          let csvData = "Date & Time,Amount,Category,Username\n";
-          entries.forEach((entry) => {
-            csvData += `"${entry.date}","${entry.amount}",${entry.category},${entry.username}\n`;
-          });
-          const buffer = Buffer.from(csvData, "utf-8");
-          await bot.sendDocument(
+      } else if (text.startsWith("/export")) {
+        try {
+          const match = text.match(/\/export(?:\s+(.*))?$/);
+          const monthInput = match && match[1] ? match[1].trim() : null;
+
+          // Parse month or use current month
+          const { month, year } = parseMonth(monthInput);
+          const monthName = getMonthName(month);
+
+          // Get transactions for the month
+          const transactions = await getTransactionsByMonth(chatId, year, month);
+
+          if (transactions.length === 0) {
+            await bot.sendMessage(
+              chatId,
+              `No transactions found for ${monthName} ${year}`
+            );
+          } else {
+            // Generate CSV
+            const csvString = generateCSV(transactions);
+            const buffer = Buffer.from(csvString, "utf-8");
+
+            // Get monthly stats
+            const stats = await getMonthlyStats(chatId, year, month);
+
+            // Send CSV file
+            const filename = `expenses_${monthName}_${year}.csv`;
+            await bot.sendDocument(
+              chatId,
+              buffer,
+              {},
+              { filename: filename, contentType: "text/csv" }
+            );
+
+            // Send overview message
+            let message = `📊 *${monthName} ${year} Overview*\n\n`;
+            message += `Total Transactions: ${stats.transactionCount}\n`;
+            message += `Total Spent: ${stats.totalSpent}\n`;
+            message += `Budget: ${stats.budget}\n`;
+            message += `Remaining: ${stats.remaining}\n`;
+
+            if (stats.categoryBreakdown && stats.categoryBreakdown.length > 0) {
+              message += `\nTop Categories:\n`;
+              const topCategories = stats.categoryBreakdown.slice(0, 5);
+              topCategories.forEach((cat) => {
+                const percentage = ((cat.total / stats.totalSpent) * 100).toFixed(1);
+                message += `• ${cat.category}: ${cat.total} (${percentage}%)\n`;
+              });
+            }
+
+            await bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
+          }
+        } catch (error) {
+          console.error("Error in /export command:", error);
+          await bot.sendMessage(
             chatId,
-            buffer,
-            {},
-            { filename: "expenses.csv", contentType: "text/csv" }
+            "Invalid month format. Use: /export Nov or /export November or /export 11\n\n" +
+              "Examples:\n" +
+              "• /export (current month)\n" +
+              "• /export Nov\n" +
+              "• /export November\n" +
+              "• /export 11"
           );
         }
       } else if (text.startsWith("/setbudget ")) {
@@ -355,19 +512,14 @@ export default async function handler(req, res) {
         );
       } else if (text === "/remaining") {
         try {
-          // Get current year and month
           const now = new Date();
           const year = now.getFullYear();
           const month = now.getMonth();
 
-          // Get monthly remaining budget
           const result = await getMonthlyRemainingBudget(chatId, year, month);
-
-          // Calculate percentage
           const percentage =
             result.budget > 0 ? (result.remaining / result.budget) * 100 : 0;
 
-          // Get status emoji
           let emoji = "✅";
           if (result.remaining <= 0) {
             emoji = "🚫";
@@ -375,7 +527,6 @@ export default async function handler(req, res) {
             emoji = "⚠️";
           }
 
-          // Format message
           const message =
             `*${emoji} Budget Status - ${result.monthName} ${result.year}*\n\n` +
             `💰 *Budget:* ${result.budget}\n` +
@@ -389,6 +540,67 @@ export default async function handler(req, res) {
           await bot.sendMessage(
             chatId,
             "Error retrieving budget information. Please try again."
+          );
+        }
+      } else if (text.startsWith("/compare")) {
+        try {
+          const match = text.match(/\/compare\s+(\S+)\s+(\S+)/);
+          
+          if (!match || !match[1] || !match[2]) {
+            await bot.sendMessage(
+              chatId,
+              'Usage: /compare <month1> <month2>\n\nExample: /compare Oct Nov'
+            );
+            return;
+          }
+
+          const month1Input = match[1].trim();
+          const month2Input = match[2].trim();
+
+          const month1 = parseMonth(month1Input);
+          const month2 = parseMonth(month2Input);
+
+          const stats1 = await getMonthlyStats(chatId, month1.year, month1.month);
+          const stats2 = await getMonthlyStats(chatId, month2.year, month2.month);
+
+          const month1Name = getMonthName(month1.month);
+          const month2Name = getMonthName(month2.month);
+
+          const difference = stats2.totalSpent - stats1.totalSpent;
+          const percentChange =
+            stats1.totalSpent > 0
+              ? ((difference / stats1.totalSpent) * 100).toFixed(1)
+              : 0;
+
+          const trendEmoji = difference > 0 ? "📈" : difference < 0 ? "📉" : "➡️";
+          const changeText =
+            difference > 0 ? "increase" : difference < 0 ? "decrease" : "no change";
+
+          let message = `📊 *Comparison: ${month1Name} ${month1.year} vs ${month2Name} ${month2.year}*\n\n`;
+
+          message += `*${month1Name} ${month1.year}:*\n`;
+          message += `• Total Spent: ${stats1.totalSpent}\n`;
+          message += `• Transactions: ${stats1.transactionCount}\n`;
+          message += `• Avg per transaction: ${stats1.avgTransaction.toFixed(2)}\n\n`;
+
+          message += `*${month2Name} ${month2.year}:*\n`;
+          message += `• Total Spent: ${stats2.totalSpent}\n`;
+          message += `• Transactions: ${stats2.transactionCount}\n`;
+          message += `• Avg per transaction: ${stats2.avgTransaction.toFixed(2)}\n\n`;
+
+          message += `*Difference:* ${trendEmoji}\n`;
+          message += `${Math.abs(difference)} (${Math.abs(percentChange)}% ${changeText})`;
+
+          await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        } catch (error) {
+          console.error('Error in /compare command:', error);
+          await bot.sendMessage(
+            chatId,
+            'Invalid month format. Use: /compare Oct Nov\n\n' +
+              'Examples:\n' +
+              '• /compare Oct Nov\n' +
+              '• /compare October November\n' +
+              '• /compare 10 11'
           );
         }
       } else if (text.startsWith("/summary")) {
