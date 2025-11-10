@@ -71,16 +71,24 @@ app.get("/", (req, res) => {
                 <p>Track expenses with simple messages like "100 Grocery"</p>
             </div>
             <div class="feature">
-                <h3>📈 Budget Management</h3>
-                <p>Set budgets and monitor remaining amounts</p>
+                <h3>�  Budget Management</h3>
+                <p>Set monthly budgets and check remaining amounts in real-time</p>
             </div>
             <div class="feature">
-                <h3>📋 Export Data</h3>
-                <p>Export your data as CSV files</p>
+                <h3>� Month Comtparison</h3>
+                <p>Compare spending between months to spot trends</p>
             </div>
             <div class="feature">
-                <h3>🔍 Category Filter</h3>
-                <p>Filter and analyze by categories</p>
+                <h3>� Expogrt & Reports</h3>
+                <p>Export monthly data as CSV with category breakdowns</p>
+            </div>
+            <div class="feature">
+                <h3>👥 Multi-User Support</h3>
+                <p>Use in personal chats or groups for shared expenses</p>
+            </div>
+            <div class="feature">
+                <h3>🔍 Category Analysis</h3>
+                <p>Filter and analyze spending by categories</p>
             </div>
         </div>
 
@@ -99,55 +107,152 @@ app.get("/", (req, res) => {
 
             <div class="commands">
                 <div class="command-card">
-                    <h3>Basic Commands</h3>
+                    <h3>🚀 Getting Started</h3>
                     <p><code>/start</code> - Initialize the bot</p>
                     <p><code>/instructions</code> - Show all commands</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Start here to set up your bot</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Add Expenses</h3>
-                    <p><code>100 Grocery</code> - Add expense entry</p>
-                    <p>Format: <code>[amount] [description]</code></p>
+                    <h3>➕ Add Expenses</h3>
+                    <p><code>100 Grocery</code> - Add expense</p>
+                    <p><code>50 Coffee</code> - Quick entry</p>
+                    <p><code>1500 Rent</code> - Any amount</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Format: [amount] [description]</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>View Entries</h3>
-                    <p><code>/view</code> - Show last 20 entries</p>
-                    <p><code>/lastentry</code> - Show latest entry</p>
+                    <h3>👀 View Expenses</h3>
+                    <p><code>/view</code> - Last 20 entries</p>
+                    <p><code>/lastentry</code> - Latest entry</p>
+                    <p><code>/category Food</code> - Filter by category</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">See your spending history</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Manage Entries</h3>
+                    <h3>✏️ Manage Entries</h3>
                     <p><code>/removelastentry</code> - Delete last entry</p>
-                    <p><code>/category Food</code> - Filter by category</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Made a mistake? Remove it easily</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Budget Control</h3>
+                    <h3>💰 Budget Tracking</h3>
                     <p><code>/setbudget 5000</code> - Set monthly budget</p>
-                    <p>Automatically calculates remaining amount</p>
+                    <p><code>/remaining</code> - Check remaining budget</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Stay on track with your budget</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Reports & Export</h3>
-                    <p><code>/export</code> - Download CSV file</p>
-                    <p><code>/export Nov</code> - Export specific month</p>
-                    <p><code>/summary daily</code> - Get expense summary</p>
+                    <h3>📊 Export & Reports</h3>
+                    <p><code>/export</code> - Export current month</p>
+                    <p><code>/export Nov</code> - Export November</p>
+                    <p><code>/export October</code> - Full month name</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Download CSV files for analysis</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Compare & Analyze</h3>
+                    <h3>📈 Compare & Analyze</h3>
                     <p><code>/compare Oct Nov</code> - Compare months</p>
-                    <p><code>/remaining</code> - Check budget status</p>
-                    <p><code>/category Food</code> - Filter by category</p>
+                    <p><code>/summary daily</code> - Daily summary</p>
+                    <p><code>/summary weekly</code> - Weekly summary</p>
+                    <p><code>/summary monthly</code> - Monthly summary</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Analyze spending patterns</p>
                 </div>
 
                 <div class="command-card">
-                    <h3>Group Expenses</h3>
-                    <p>Add bot to a Telegram group to track shared expenses</p>
-                    <p>Everyone in the group can add and view expenses together</p>
-                    <p>Perfect for roommates, families, or teams!</p>
+                    <h3>👥 Group Expenses</h3>
+                    <p><strong>Track shared expenses with friends!</strong></p>
+                    <p>1. Create a Telegram group</p>
+                    <p>2. Add this bot to the group</p>
+                    <p>3. Everyone can add/view expenses</p>
+                    <p style="margin-top: 10px; color: #667eea; font-weight: bold;">Perfect for roommates, families, or teams!</p>
                 </div>
+
+                <div class="command-card">
+                    <h3>🎯 Advanced Features</h3>
+                    <p><code>/summary custom 2024-01-01 2024-01-31</code></p>
+                    <p style="margin-top: 5px;">Custom date range summaries</p>
+                    <p style="margin-top: 10px;"><code>/category Groceries</code></p>
+                    <p style="margin-top: 5px;">Filter by specific categories</p>
+                    <p style="margin-top: 10px; color: #666; font-size: 0.9em;">Power user features</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="guide" style="margin-top: 30px;">
+            <h2>📋 Complete Command Reference</h2>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr style="background: #667eea; color: white;">
+                            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Command</th>
+                            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Description</th>
+                            <th style="padding: 12px; text-align: left; border: 1px solid #ddd;">Example</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/start</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Initialize the bot</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/start</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/instructions</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Show all available commands</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/instructions</code></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>[amount] [description]</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Add a new expense</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>100 Grocery</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/view</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">View last 20 entries</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/view</code></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/lastentry</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">View the last entry</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/lastentry</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/removelastentry</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Remove the last entry</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/removelastentry</code></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/setbudget</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Set monthly budget</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/setbudget 5000</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/remaining</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Check remaining budget for current month</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/remaining</code></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/export</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Export month transactions as CSV</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/export</code> or <code>/export Nov</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/compare</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Compare spending between two months</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/compare Oct Nov</code></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/category</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Filter spending by category</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/category Food</code></td>
+                        </tr>
+                        <tr style="background: #f8f9fa;">
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/summary</code></td>
+                            <td style="padding: 10px; border: 1px solid #ddd;">Get expense summary</td>
+                            <td style="padding: 10px; border: 1px solid #ddd;"><code>/summary daily</code></td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
